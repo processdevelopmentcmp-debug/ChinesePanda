@@ -20,6 +20,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.AddCircleOutline
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.CompareArrows
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.FilterChip
@@ -35,6 +37,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,15 +47,22 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.HskCurriculumData
+import com.example.data.MandarinDrillsData
 import com.example.ui.components.HskLevelPill
 import com.example.ui.components.PandaActionButton
+import com.example.ui.components.ToneColorLegendRow
+import com.example.ui.components.ToneColoredHanziPinyinBlock
 import com.example.ui.theme.CoralVermilion
+import com.example.ui.theme.HanziSerifFontFamily
 import com.example.ui.theme.IndigoAccent
+import com.example.ui.theme.JadeLightContainer
 import com.example.ui.theme.JadePrimary
 import com.example.viewmodel.PandaViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun ListeningStudioSection(viewModel: PandaViewModel) {
@@ -60,6 +70,7 @@ fun ListeningStudioSection(viewModel: PandaViewModel) {
     val questions = HskCurriculumData.listeningQuestions
 
     var examMode by remember { mutableStateOf(false) }
+    var minimalPairMode by remember { mutableStateOf(false) }
     var currentIdx by remember { mutableIntStateOf(0) }
     var selectedOption by remember { mutableStateOf<Int?>(null) }
     var replaysUsed by remember { mutableIntStateOf(0) }
@@ -69,9 +80,9 @@ fun ListeningStudioSection(viewModel: PandaViewModel) {
     val missedWordKeys = remember { mutableStateListOf<String>() }
 
     // Official Exam Mode Countdown Timer
-    LaunchedEffect(examMode, finished) {
-        if (examMode && !finished) {
-            while (secondsLeft > 0 && examMode && !finished) {
+    LaunchedEffect(examMode, minimalPairMode, finished) {
+        if (examMode && !minimalPairMode && !finished) {
+            while (secondsLeft > 0 && examMode && !minimalPairMode && !finished) {
                 delay(1000L)
                 secondsLeft--
             }
@@ -80,6 +91,7 @@ fun ListeningStudioSection(viewModel: PandaViewModel) {
     }
 
     fun resetTest(newExamMode: Boolean) {
+        minimalPairMode = false
         examMode = newExamMode
         currentIdx = 0
         selectedOption = null
@@ -114,19 +126,27 @@ fun ListeningStudioSection(viewModel: PandaViewModel) {
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     FilterChip(
-                        selected = !examMode,
+                        selected = !examMode && !minimalPairMode,
                         onClick = { resetTest(false) },
-                        label = { Text("Practice Mode") },
+                        label = { Text("Practice", style = MaterialTheme.typography.labelMedium) },
                         modifier = Modifier.weight(1f)
                     )
                     FilterChip(
-                        selected = examMode,
+                        selected = examMode && !minimalPairMode,
                         onClick = { resetTest(true) },
-                        label = { Text("Official Exam") },
+                        label = { Text("Exam", style = MaterialTheme.typography.labelMedium) },
                         modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = minimalPairMode,
+                        onClick = { minimalPairMode = true },
+                        label = { Text("Minimal Pairs", style = MaterialTheme.typography.labelMedium) },
+                        modifier = Modifier
+                            .weight(1.25f)
+                            .testTag("listening_minimal_pairs_tab")
                     )
                 }
 
@@ -147,6 +167,11 @@ fun ListeningStudioSection(viewModel: PandaViewModel) {
                     }
                 }
             }
+        }
+
+        if (minimalPairMode) {
+            MinimalPairListeningQuizPane(viewModel = viewModel)
+            return
         }
 
         if (finished) {
@@ -357,3 +382,241 @@ fun ListeningStudioSection(viewModel: PandaViewModel) {
         }
     }
 }
+
+@Composable
+private fun MinimalPairListeningQuizPane(viewModel: PandaViewModel) {
+    val pairs = MandarinDrillsData.minimalPairQuizzes
+    val coroutineScope = rememberCoroutineScope()
+
+    var currentIdx by remember { mutableIntStateOf(0) }
+    var targetIsRight by remember(currentIdx) { mutableStateOf((0..1).random() == 1) }
+    var chosenRight by remember(currentIdx) { mutableStateOf<Boolean?>(null) }
+    var streak by remember { mutableIntStateOf(0) }
+    var totalCorrect by remember { mutableIntStateOf(0) }
+
+    val pair = pairs[currentIdx]
+    val targetHanzi = if (targetIsRight) pair.rightHanzi else pair.leftHanzi
+    val targetPinyin = if (targetIsRight) pair.rightPinyin else pair.leftPinyin
+    val answered = chosenRight != null
+    val wasCorrect = chosenRight == targetIsRight
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("minimal_pair_quiz_card"),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.5.dp, IndigoAccent.copy(alpha = 0.65f))
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = IndigoAccent.copy(alpha = 0.14f)
+                ) {
+                    Text(
+                        text = pair.category,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = IndigoAccent,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+                Text(
+                    text = "Pair ${currentIdx + 1}/${pairs.size} · Streak $streak",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            ToneColorLegendRow()
+
+            Text(
+                text = "Listen carefully, then tap which Mandarin word you heard!",
+                style = MaterialTheme.typography.titleSmall,
+                textAlign = TextAlign.Center
+            )
+
+            // Play Target Word Button
+            Surface(
+                modifier = Modifier
+                    .size(86.dp)
+                    .clip(CircleShape)
+                    .clickable { viewModel.speakChinese(targetHanzi) }
+                    .testTag("minimal_pair_play_target_button"),
+                shape = CircleShape,
+                color = IndigoAccent,
+                shadowElevation = 4.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.VolumeUp,
+                        contentDescription = "Play target word",
+                        tint = Color.White,
+                        modifier = Modifier.size(38.dp)
+                    )
+                }
+            }
+
+            OutlinedButton(
+                onClick = {
+                    coroutineScope.launch {
+                        viewModel.speakChinese(pair.leftHanzi)
+                        delay(950L)
+                        viewModel.speakChinese(pair.rightHanzi)
+                    }
+                },
+                shape = RoundedCornerShape(50),
+                modifier = Modifier.testTag("minimal_pair_compare_both_button")
+            ) {
+                Icon(Icons.Rounded.CompareArrows, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Hear Both Back-to-Back")
+            }
+
+            // Two Side-by-Side Choice Cards
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                listOf(false, true).forEach { isRightOption ->
+                    val hanzi = if (isRightOption) pair.rightHanzi else pair.leftHanzi
+                    val pinyin = if (isRightOption) pair.rightPinyin else pair.leftPinyin
+                    val english = if (isRightOption) pair.rightEnglish else pair.leftEnglish
+
+                    val isCorrectCard = isRightOption == targetIsRight
+                    val isSelectedCard = chosenRight == isRightOption
+
+                    val bg = when {
+                        answered && isCorrectCard -> JadeLightContainer
+                        answered && isSelectedCard && !isCorrectCard -> CoralVermilion.copy(alpha = 0.16f)
+                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    }
+                    val border = when {
+                        answered && isCorrectCard -> JadePrimary
+                        answered && isSelectedCard && !isCorrectCard -> CoralVermilion
+                        else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(18.dp))
+                            .clickable {
+                                if (!answered) {
+                                    chosenRight = isRightOption
+                                    if (isCorrectCard) {
+                                        streak++
+                                        totalCorrect++
+                                        viewModel.awardXp(12L, null, "Minimal pair nailed: $targetHanzi ($targetPinyin)")
+                                    } else {
+                                        streak = 0
+                                    }
+                                } else {
+                                    viewModel.speakChinese(hanzi)
+                                }
+                            }
+                            .testTag(if (isRightOption) "minimal_pair_option_right" else "minimal_pair_option_left"),
+                        shape = RoundedCornerShape(18.dp),
+                        color = bg,
+                        border = BorderStroke(if (answered && (isCorrectCard || isSelectedCard)) 2.dp else 1.dp, border)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 18.dp, horizontal = 10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            ToneColoredHanziPinyinBlock(
+                                hanzi = hanzi,
+                                pinyin = pinyin,
+                                hanziFontSize = 36.sp,
+                                showPinyin = true,
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
+                            )
+                            Text(
+                                text = "\"$english\"",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                            if (answered) {
+                                Text(
+                                    text = "Tap to hear",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = IndigoAccent
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (answered) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (wasCorrect) JadeLightContainer else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.CheckCircle,
+                                contentDescription = null,
+                                tint = if (wasCorrect) JadePrimary else CoralVermilion,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = if (wasCorrect) {
+                                    "Spot on! You heard $targetHanzi ($targetPinyin)"
+                                } else {
+                                    "Target was $targetHanzi ($targetPinyin)"
+                                },
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            text = pair.distinctionTip,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                PandaActionButton(
+                    text = if (currentIdx == pairs.lastIndex) "Restart Minimal Pairs ($totalCorrect/${pairs.size})" else "Next Minimal Pair",
+                    onClick = {
+                        if (currentIdx == pairs.lastIndex) {
+                            currentIdx = 0
+                            totalCorrect = 0
+                        } else {
+                            currentIdx++
+                        }
+                        chosenRight = null
+                    },
+                    containerColor = JadePrimary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("minimal_pair_next_button")
+                )
+            }
+        }
+    }
+}
+

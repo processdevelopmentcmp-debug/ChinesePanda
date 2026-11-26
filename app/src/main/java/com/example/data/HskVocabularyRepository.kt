@@ -223,6 +223,79 @@ class HskVocabularyRepository(
         dao.getVocabularyByHanzi(hanzi)?.toVocabWord()
     }
 
+    suspend fun getWordsForTopics(topicIds: List<Int>, limit: Int = 30): List<VocabWord> =
+        withContext(Dispatchers.IO) {
+            if (topicIds.isEmpty()) return@withContext emptyList()
+            dao.getWordsForTopics(topicIds, limit).map { it.toVocabWord() }
+        }
+
+    suspend fun getWordsForTopicNode(
+        topicId: Int,
+        minHsk: Int,
+        maxHsk: Int,
+        limit: Int = 10
+    ): List<VocabWord> = withContext(Dispatchers.IO) {
+        val exact = dao.getWordsForTopicAndLevelRange(topicId, minHsk, maxHsk, limit)
+            .map { it.toVocabWord() }
+        if (exact.size >= 4) exact
+        else dao.getWordsForTopicAndLevelRange(topicId, 1, 9, limit).map { it.toVocabWord() }
+    }
+
+    suspend fun getShortcutWordsForLevel(targetLevel: Int, limit: Int = 18): List<VocabWord> =
+        withContext(Dispatchers.IO) {
+            val (minLvl, maxLvl) = if (targetLevel >= 7) 7 to 9 else targetLevel.coerceIn(1, 6) to targetLevel.coerceIn(1, 6)
+            val exact = dao.getRandomWordsForLevelRange(minLvl, maxLvl, limit).map { it.toVocabWord() }
+            if (exact.size >= 8) exact
+            else dao.getRandomWordsForLevelRange(1, 9, limit).map { it.toVocabWord() }
+        }
+
+    suspend fun getWordsByHanziList(hanziSet: Set<String>): List<VocabWord> =
+        withContext(Dispatchers.IO) {
+            if (hanziSet.isEmpty()) return@withContext emptyList()
+            val result = mutableListOf<VocabWord>()
+            hanziSet.toList().chunked(400).forEach { chunk ->
+                result.addAll(dao.getVocabularyByHanziList(chunk).map { it.toVocabWord() })
+            }
+            result
+        }
+
+    /**
+     * Fetches the next [limit] unlearned HSK words for the user's chosen daily goal HSK scope,
+     * scanning ordered pages in Room so already-learned words are skipped cleanly.
+     */
+    suspend fun getNextUnlearnedWordsForLevel(
+        levelFilter: String,
+        alreadyLearnedHanzi: Set<String>,
+        limit: Int = 10
+    ): List<VocabWord> = withContext(Dispatchers.IO) {
+        val targetLimit = limit.coerceIn(1, 30)
+        val (minLvl, maxLvl) = levelBounds(levelFilter)
+        val collected = mutableListOf<VocabWord>()
+        val seen = HashSet<String>()
+        var offset = 0
+        val pageSize = 200
+
+        while (collected.size < targetLimit && offset <= 12_000) {
+            val page = dao.getOrderedWordsForLevelRange(minLvl, maxLvl, pageSize, offset)
+            if (page.isEmpty()) break
+            for (entity in page) {
+                if (entity.hanzi !in alreadyLearnedHanzi && seen.add(entity.hanzi)) {
+                    collected.add(entity.toVocabWord())
+                    if (collected.size >= targetLimit) break
+                }
+            }
+            if (page.size < pageSize) break
+            offset += pageSize
+        }
+
+        // If the user has mastered every word in the chosen level, fall back to fresh words from the level
+        if (collected.isEmpty()) {
+            return@withContext dao.getOrderedWordsForLevelRange(minLvl, maxLvl, targetLimit, 0)
+                .map { it.toVocabWord() }
+        }
+        collected
+    }
+
     /**
      * Populates the local Room database immediately with the curated starter HSK 3.0 vocabulary
      * and 14 topics so the UI renders with 0ms delay even before the full 11,000+ sync completes.

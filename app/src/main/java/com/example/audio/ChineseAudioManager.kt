@@ -13,6 +13,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.Locale
 
+import android.speech.tts.UtteranceProgressListener
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
+import java.util.concurrent.ConcurrentHashMap
+
 private const val AUDIO_TAG = "ChineseAudioManager"
 
 class ChineseAudioManager(private val appContext: Context) {
@@ -20,6 +26,7 @@ class ChineseAudioManager(private val appContext: Context) {
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     private var speechRecognizer: SpeechRecognizer? = null
+    private val pendingSynthDeferreds = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
 
     private val _isListening = MutableStateFlow(false)
     val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
@@ -38,6 +45,27 @@ class ChineseAudioManager(private val appContext: Context) {
                     tts?.setLanguage(Locale.CHINESE)
                     ttsReady = true
                 }
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) = Unit
+                    override fun onDone(utteranceId: String?) {
+                        if (utteranceId != null) {
+                            pendingSynthDeferreds.remove(utteranceId)?.complete(true)
+                        }
+                    }
+
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(utteranceId: String?) {
+                        if (utteranceId != null) {
+                            pendingSynthDeferreds.remove(utteranceId)?.complete(false)
+                        }
+                    }
+
+                    override fun onError(utteranceId: String?, errorCode: Int) {
+                        if (utteranceId != null) {
+                            pendingSynthDeferreds.remove(utteranceId)?.complete(false)
+                        }
+                    }
+                })
             } else {
                 Log.w(AUDIO_TAG, "TTS initialization status: $status")
             }
@@ -52,6 +80,43 @@ class ChineseAudioManager(private val appContext: Context) {
         }
         engine.setSpeechRate(speed.coerceIn(0.5f, 1.5f))
         engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, "panda_${System.currentTimeMillis()}")
+    }
+
+    /**
+     * Synthesizes a native Mandarin reference utterance to a local WAV file so its
+     * real F0 pitch contour can be extracted and overlaid against the learner's recording.
+     */
+    suspend fun synthesizeToWavFile(
+        text: String,
+        outputFile: File,
+        speed: Float = 0.85f,
+        timeoutMs: Long = 3500L
+    ): Boolean {
+        if (text.isBlank()) return false
+        val engine = tts ?: return false
+        if (!ttsReady) return false
+
+        val utteranceId = "panda_synth_${System.nanoTime()}"
+        val deferred = CompletableDeferred<Boolean>()
+        pendingSynthDeferreds[utteranceId] = deferred
+
+        return try {
+            outputFile.parentFile?.mkdirs()
+            if (outputFile.exists()) outputFile.delete()
+            engine.setSpeechRate(speed.coerceIn(0.5f, 1.5f))
+            val result = engine.synthesizeToFile(text, Bundle(), outputFile, utteranceId)
+            if (result != TextToSpeech.SUCCESS) {
+                pendingSynthDeferreds.remove(utteranceId)
+                return false
+            }
+            val ok = withTimeoutOrNull(timeoutMs) { deferred.await() } ?: false
+            ok && outputFile.exists() && outputFile.length() > 64L
+        } catch (e: Exception) {
+            Log.w(AUDIO_TAG, "TTS synthesizeToFile failed", e)
+            false
+        } finally {
+            pendingSynthDeferreds.remove(utteranceId)
+        }
     }
 
     fun startChineseListening(

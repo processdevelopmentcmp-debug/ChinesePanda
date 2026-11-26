@@ -6,6 +6,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +27,7 @@ import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Psychology
+import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -57,6 +60,10 @@ import com.example.model.SrsCardDoc
 import com.example.model.UiState
 import com.example.ui.components.HskLevelPill
 import com.example.ui.components.PandaActionButton
+import com.example.ui.components.ToneColorLegendRow
+import com.example.ui.components.ToneColoredHanziPinyinBlock
+import com.example.ui.components.buildToneColoredHanziString
+import com.example.ui.components.buildToneColoredPinyinString
 import com.example.ui.theme.CoralVermilion
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.GoldBright
@@ -67,11 +74,16 @@ import com.example.ui.theme.JadePrimary
 import com.example.viewmodel.PandaViewModel
 
 @Composable
-fun ReviewAndStoriesScreen(viewModel: PandaViewModel) {
+fun ReviewAndStoriesScreen(
+    viewModel: PandaViewModel,
+    onOpenLearnedVault: () -> Unit = {},
+    onOpenTopicAnkiSelector: () -> Unit = {}
+) {
     val srsState by viewModel.srsCardsState.collectAsStateWithLifecycle()
     val stories by viewModel.allStories.collectAsStateWithLifecycle()
     val isGeneratingStory by viewModel.isGeneratingStory.collectAsStateWithLifecycle()
     val isGeneratingMnemonic by viewModel.isGeneratingMnemonic.collectAsStateWithLifecycle()
+    val learnedEntries by viewModel.learnedWordEntries.collectAsStateWithLifecycle()
 
     var showSrs by remember { mutableStateOf(true) }
 
@@ -104,6 +116,82 @@ fun ReviewAndStoriesScreen(viewModel: PandaViewModel) {
         }
 
         if (showSrs) {
+            // Quick Launcher Strip: Already Learned (Learned So Far) + Topic-by-Topic Anki Review + Full-Screen Anki Mode
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    onClick = onOpenLearnedVault,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("review_open_learned_button"),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                        Text(
+                            text = "Learned (${learnedEntries.size})",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = "Weak / Med / Strong",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+                Surface(
+                    onClick = onOpenTopicAnkiSelector,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("review_open_topic_anki_button"),
+                    shape = RoundedCornerShape(14.dp),
+                    color = IndigoAccent.copy(alpha = 0.14f)
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                        Text(
+                            text = "Topic Anki",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = IndigoAccent,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = "Pick topics to review",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = IndigoAccent.copy(alpha = 0.85f)
+                        )
+                    }
+                }
+                Surface(
+                    onClick = { viewModel.startDueAnkiReview() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("review_fullscreen_anki_button"),
+                    shape = RoundedCornerShape(14.dp),
+                    color = JadePrimary
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                        Text(
+                            text = "Anki Mode",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = "Clean flashcard UI",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.9f)
+                        )
+                    }
+                }
+            }
+
             Sm2ReviewPane(
                 srsState = srsState,
                 isGeneratingMnemonic = isGeneratingMnemonic,
@@ -114,11 +202,13 @@ fun ReviewAndStoriesScreen(viewModel: PandaViewModel) {
         } else {
             GradedStoriesPane(
                 stories = stories,
+                learnedCount = learnedEntries.size,
                 isGeneratingStory = isGeneratingStory,
                 onSpeak = { viewModel.speakChinese(it) },
+                onLookupWord = { word -> viewModel.openAcquiredWordBreakdown(word) },
                 onQuizPass = { viewModel.awardXp(20L, null, "Story quiz mastered!") },
-                onGenerateStory = { level, topic, onDone ->
-                    viewModel.generateAndSaveAiStory(level, topic, onDone)
+                onGenerateStory = { level, topic, useUnlockedOnly, onDone ->
+                    viewModel.generateAndSaveAiStory(level, topic, useUnlockedOnly, onDone)
                 }
             )
         }
@@ -248,18 +338,11 @@ private fun Sm2ReviewPane(
                                 }
                             }
 
-                            Text(
-                                text = card.hanzi,
-                                fontFamily = HanziSerifFontFamily,
-                                fontSize = 54.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-
-                            Text(
-                                text = card.pinyin,
-                                style = MaterialTheme.typography.titleLarge,
-                                color = JadePrimary
+                            ToneColoredHanziPinyinBlock(
+                                hanzi = card.hanzi,
+                                pinyin = card.pinyin,
+                                hanziFontSize = 54.sp,
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
                             )
 
                             if (flipped) {
@@ -393,19 +476,24 @@ private fun Sm2ReviewPane(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun GradedStoriesPane(
     stories: List<GradedStory>,
+    learnedCount: Int,
     isGeneratingStory: Boolean,
     onSpeak: (String) -> Unit,
+    onLookupWord: (String) -> Unit,
     onQuizPass: () -> Unit,
-    onGenerateStory: (Int, String, (GradedStory) -> Unit) -> Unit
+    onGenerateStory: (Int, String, Boolean, (GradedStory) -> Unit) -> Unit
 ) {
     var selectedStoryId by remember { mutableStateOf(stories.firstOrNull()?.id ?: "") }
     val activeStory = stories.firstOrNull { it.id == selectedStoryId } ?: stories.first()
 
     var showPinyin by remember { mutableStateOf(true) }
     var showEnglish by remember { mutableStateOf(true) }
+    var colorTones by remember { mutableStateOf(true) }
+    var expandedSentenceIdx by remember(activeStory.id) { mutableStateOf<Int?>(null) }
     var selectedQuizOpt by remember(activeStory.id) { mutableStateOf<Int?>(null) }
     var showStoryGenDialog by remember { mutableStateOf(false) }
 
@@ -476,23 +564,33 @@ private fun GradedStoriesPane(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         HskLevelPill(level = activeStory.hskLevel)
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            FilterChip(
-                                selected = showPinyin,
-                                onClick = { showPinyin = !showPinyin },
-                                label = { Text("Pinyin") }
-                            )
-                            FilterChip(
-                                selected = showEnglish,
-                                onClick = { showEnglish = !showEnglish },
-                                label = { Text("English") }
-                            )
-                        }
+                        FilterChip(
+                            selected = colorTones,
+                            onClick = { colorTones = !colorTones },
+                            label = { Text("Color Tones") },
+                            modifier = Modifier.testTag("story_color_tones_chip")
+                        )
+                        FilterChip(
+                            selected = showPinyin,
+                            onClick = { showPinyin = !showPinyin },
+                            label = { Text("Pinyin") }
+                        )
+                        FilterChip(
+                            selected = showEnglish,
+                            onClick = { showEnglish = !showEnglish },
+                            label = { Text("English") }
+                        )
+                    }
+
+                    if (colorTones) {
+                        ToneColorLegendRow()
                     }
 
                     Text(
@@ -503,53 +601,135 @@ private fun GradedStoriesPane(
                         color = JadeDeep
                     )
                     Text(
-                        text = activeStory.titleEn,
+                        text = "${activeStory.titleEn} · Tap any sentence to inspect & translate characters",
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    activeStory.sentences.forEach { sentence ->
+                    activeStory.sentences.forEachIndexed { sIdx, sentence ->
+                        val isInspecting = expandedSentenceIdx == sIdx
+                        val fallbackColor = MaterialTheme.colorScheme.onSurface
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
-                                .clickable { onSpeak(sentence.zh) },
+                                .clickable {
+                                    onSpeak(sentence.zh)
+                                    expandedSentenceIdx = if (isInspecting) null else sIdx
+                                },
                             shape = RoundedCornerShape(14.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                            color = if (isInspecting) {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                            }
                         ) {
-                            Row(
+                            Column(
                                 modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.Top,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                    Text(
-                                        text = sentence.zh,
-                                        fontFamily = HanziSerifFontFamily,
-                                        fontSize = 18.sp,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    if (showPinyin) {
-                                        Text(
-                                            text = sentence.pinyin,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = JadePrimary
-                                        )
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        if (colorTones) {
+                                            Text(
+                                                text = buildToneColoredHanziString(sentence.zh, sentence.pinyin, fallbackColor),
+                                                fontFamily = HanziSerifFontFamily,
+                                                fontSize = 18.sp
+                                            )
+                                        } else {
+                                            Text(
+                                                text = sentence.zh,
+                                                fontFamily = HanziSerifFontFamily,
+                                                fontSize = 18.sp,
+                                                color = fallbackColor
+                                            )
+                                        }
+                                        if (showPinyin) {
+                                            if (colorTones) {
+                                                Text(
+                                                    text = buildToneColoredPinyinString(sentence.pinyin),
+                                                    style = MaterialTheme.typography.bodySmall
+                                                )
+                                            } else {
+                                                Text(
+                                                    text = sentence.pinyin,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = JadePrimary
+                                                )
+                                            }
+                                        }
+                                        if (showEnglish) {
+                                            Text(
+                                                text = sentence.en,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
-                                    if (showEnglish) {
-                                        Text(
-                                            text = sentence.en,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    IconButton(
+                                        onClick = { onSpeak(sentence.zh) },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.AutoMirrored.Rounded.VolumeUp,
+                                            contentDescription = "Listen sentence",
+                                            tint = JadePrimary,
+                                            modifier = Modifier.size(18.dp)
                                         )
                                     }
                                 }
-                                Icon(
-                                    Icons.AutoMirrored.Rounded.VolumeUp,
-                                    contentDescription = "Listen sentence",
-                                    tint = JadePrimary,
-                                    modifier = Modifier.size(18.dp)
-                                )
+
+                                // Tap-to-Translate Individual Character Tray
+                                if (isInspecting) {
+                                    val hanChars = remember(sentence.zh) {
+                                        sentence.zh.filter { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN }
+                                            .map { it.toString() }
+                                            .distinct()
+                                    }
+                                    if (hanChars.isNotEmpty()) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(Icons.Rounded.Translate, contentDescription = null, tint = IndigoAccent, modifier = Modifier.size(14.dp))
+                                            Text(
+                                                text = "Tap any character for audio, meaning & radical story:",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = IndigoAccent
+                                            )
+                                        }
+                                        FlowRow(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            hanChars.forEach { ch ->
+                                                Surface(
+                                                    modifier = Modifier
+                                                        .clip(RoundedCornerShape(10.dp))
+                                                        .clickable {
+                                                            onSpeak(ch)
+                                                            onLookupWord(ch)
+                                                        },
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    color = MaterialTheme.colorScheme.surface,
+                                                    border = BorderStroke(1.dp, IndigoAccent.copy(alpha = 0.45f))
+                                                ) {
+                                                    Text(
+                                                        text = ch,
+                                                        fontFamily = HanziSerifFontFamily,
+                                                        fontSize = 18.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = IndigoAccent,
+                                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -599,6 +779,7 @@ private fun GradedStoriesPane(
     if (showStoryGenDialog) {
         var chosenLevel by remember { mutableIntStateOf(3) }
         var chosenTopicIdx by remember { mutableIntStateOf(4) }
+        var useUnlockedOnly by remember { mutableStateOf(learnedCount >= 3) }
 
         AlertDialog(
             onDismissRequest = { if (!isGeneratingStory) showStoryGenDialog = false },
@@ -631,6 +812,12 @@ private fun GradedStoriesPane(
                             )
                         }
                     }
+                    FilterChip(
+                        selected = useUnlockedOnly,
+                        onClick = { useUnlockedOnly = !useUnlockedOnly },
+                        label = { Text("Use My Unlocked Vocabulary Only ($learnedCount words)") },
+                        modifier = Modifier.testTag("story_unlocked_vocab_toggle")
+                    )
                     if (isGeneratingStory) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -644,7 +831,7 @@ private fun GradedStoriesPane(
                     enabled = !isGeneratingStory,
                     onClick = {
                         val topic = HskCurriculumData.topics[chosenTopicIdx].nameEn
-                        onGenerateStory(chosenLevel, topic) { created ->
+                        onGenerateStory(chosenLevel, topic, useUnlockedOnly) { created ->
                             selectedStoryId = created.id
                             showStoryGenDialog = false
                         }

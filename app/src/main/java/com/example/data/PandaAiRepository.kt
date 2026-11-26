@@ -1,5 +1,6 @@
 package com.example.data
 
+import android.graphics.Bitmap
 import android.util.Log
 import com.example.data.local.AiCharacterNote
 import com.example.data.local.CharacterAnatomy
@@ -7,9 +8,14 @@ import com.example.data.local.RelatedFamilyWord
 import com.example.data.local.WordEtymologyStory
 import com.example.model.AiChatMessage
 import com.example.model.AiSentenceGrade
+import com.example.model.CameraPointLearnResult
 import com.example.model.GradedStory
+import com.example.model.GrammarTransformResult
 import com.example.model.GroundedSource
 import com.example.model.LessonQuestion
+import com.example.model.ScannedSecondaryObject
+import com.example.model.ShadowingFlaggedWord
+import com.example.model.ShadowingGradeResult
 import com.example.model.StorySentenceDoc
 import com.example.model.TutorMode
 import com.example.model.VocabWord
@@ -34,6 +40,7 @@ private const val MODEL_GENERAL = "gemini-4-hydrogen"
 private const val MODEL_DEEP_REASONING = "gemini-4-carbon"
 private const val MODEL_INTERACTIVE = "gemini-4-neon"
 private const val MODEL_FAST = "gemini-3.1-flash-lite"
+private const val MODEL_FLASH_38 = "gemini-3.8-flash"
 
 data class TeacherStreamChunk(
     val textDelta: String = "",
@@ -250,6 +257,93 @@ class PandaAiRepository {
         )
     }
 
+    private val cameraVisionModel by lazy {
+        val secondarySchema = Schema.obj(
+            properties = mapOf(
+                "hanzi" to Schema.string("Simplified Chinese word for another visible object"),
+                "pinyin" to Schema.string("Tone-marked Pinyin"),
+                "english" to Schema.string("English meaning")
+            )
+        )
+        val scanSchema = Schema.obj(
+            properties = mapOf(
+                "hanzi" to Schema.string("Primary identified object or sign text in Simplified Chinese"),
+                "pinyin" to Schema.string("Accurate tone-marked Pinyin separated by syllable spaces"),
+                "english" to Schema.string("Clear English translation"),
+                "hskLevel" to Schema.integer("Estimated HSK 3.0 level from 1 to 9"),
+                "radicalTip" to Schema.string("Short vivid radical or character-memory hook for the word"),
+                "exampleHanzi" to Schema.string("Natural HSK-level Chinese example sentence using this word"),
+                "examplePinyin" to Schema.string("Tone-marked Pinyin for the example sentence"),
+                "exampleEnglish" to Schema.string("English translation of the example sentence"),
+                "relatedObjects" to Schema.array(secondarySchema, "Up to 3 other visible objects/concepts in the photo")
+            )
+        )
+        Firebase.ai.generativeModel(
+            modelName = MODEL_FLASH_38,
+            generationConfig = generationConfig {
+                responseMimeType = "application/json"
+                responseSchema = scanSchema
+            }
+        )
+    }
+
+    private val grammarTransformModel by lazy {
+        val transformSchema = Schema.obj(
+            properties = mapOf(
+                "transformedHanzi" to Schema.string("The transformed Simplified Chinese sentence"),
+                "transformedPinyin" to Schema.string("Accurate tone-marked Pinyin"),
+                "transformedEnglish" to Schema.string("Natural English translation"),
+                "highlightedChanges" to Schema.array(Schema.string(), "List of 1 to 4 concise tags explaining exact tokens moved or added (e.g. 'Added 了 after verb 吃')"),
+                "grammarExplanation" to Schema.string("Clear 2-sentence explanation of what moved/changed and the Mandarin grammar rule")
+            )
+        )
+        Firebase.ai.generativeModel(
+            modelName = MODEL_FLASH_38,
+            generationConfig = generationConfig {
+                responseMimeType = "application/json"
+                responseSchema = transformSchema
+            }
+        )
+    }
+
+    private val shadowingGraderModel by lazy {
+        val flaggedSchema = Schema.obj(
+            properties = mapOf(
+                "expectedWord" to Schema.string("Specific Chinese word/character from the target script that was missed or mispronounced"),
+                "expectedPinyin" to Schema.string("Correct tone-marked Pinyin"),
+                "issue" to Schema.string("Short diagnosis of the pronunciation or tone issue")
+            )
+        )
+        val shadowSchema = Schema.obj(
+            properties = mapOf(
+                "fluencyScore" to Schema.integer("Score from 0 to 100 comparing recognized text to target script"),
+                "verdict" to Schema.string("Short encouraging verdict (e.g., Native Rhythm, Almost There, Needs Tone Polish)"),
+                "flaggedWords" to Schema.array(flaggedSchema, "Specific words/tones missed or altered (empty if perfect)"),
+                "coachingTip" to Schema.string("Actionable 1-2 sentence Mandarin pronunciation tip for retrying")
+            )
+        )
+        Firebase.ai.generativeModel(
+            modelName = MODEL_FLASH_38,
+            generationConfig = generationConfig {
+                responseMimeType = "application/json"
+                responseSchema = shadowSchema
+            }
+        )
+    }
+
+    private val socraticHintModel by lazy {
+        Firebase.ai.generativeModel(
+            modelName = MODEL_FLASH_38,
+            systemInstruction = content {
+                text(
+                    "You are a Socratic Mandarin grammar tutor. Give ONLY ONE short, friendly guiding sentence (max 25 words) " +
+                        "that points out the learner's exact word-order mistake (like time/place placement or particle position) " +
+                        "WITHOUT revealing the full correct Chinese sentence."
+                )
+            }
+        )
+    }
+
     fun streamTeacherReply(
         history: List<AiChatMessage>,
         userPrompt: String,
@@ -400,10 +494,18 @@ class PandaAiRepository {
         }
     }
 
-    suspend fun generateGradedStory(hskLevel: Int, topicName: String): Result<GradedStory> {
+    suspend fun generateGradedStory(
+        hskLevel: Int,
+        topicName: String,
+        unlockedWords: List<String> = emptyList()
+    ): Result<GradedStory> {
         return try {
+            val vocabConstraint = if (unlockedWords.isNotEmpty()) {
+                val sample = unlockedWords.take(45).joinToString("、")
+                " IMPORTANT: Prioritize and build the story primarily using the learner's unlocked vocabulary: [$sample], adding only basic HSK 1 glue words if strictly needed."
+            } else ""
             val prompt = "Write an engaging, culturally authentic graded Chinese short story strictly calibrated " +
-                "to HSK 3.0 Level $hskLevel about '$topicName'. Provide 5 to 6 sentences with Simplified Hanzi, " +
+                "to HSK 3.0 Level $hskLevel about '$topicName'.$vocabConstraint Provide 5 to 6 sentences with Simplified Hanzi, " +
                 "tone-marked Pinyin, and natural English, plus a 3-option comprehension question."
             val response = withTimeout(60_000L) {
                 storyGeneratorModel.generateContent(prompt)
@@ -586,6 +688,202 @@ class PandaAiRepository {
             throw e
         } catch (e: Exception) {
             Log.e(AI_TAG, "Word etymology generation failed", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun analyzePhotoPointAndLearn(
+        bitmap: Bitmap,
+        targetHskLevel: Int
+    ): Result<CameraPointLearnResult> {
+        return try {
+            // Downscale large bitmaps safely under 1024px to stay well beneath inline payload limits
+            val maxDim = 1024
+            val scaled = if (bitmap.width > maxDim || bitmap.height > maxDim) {
+                val ratio = minOf(maxDim.toFloat() / bitmap.width, maxDim.toFloat() / bitmap.height)
+                Bitmap.createScaledBitmap(
+                    bitmap,
+                    (bitmap.width * ratio).toInt().coerceAtLeast(1),
+                    (bitmap.height * ratio).toInt().coerceAtLeast(1),
+                    true
+                )
+            } else bitmap
+
+            val prompt = "Identify the main real-world object, food, street sign, or text in this photo for a Mandarin Chinese learner at HSK Level $targetHskLevel. " +
+                "Return the most natural Simplified Chinese word, accurate tone-marked Pinyin with spaces between syllables, English meaning, " +
+                "a concise radical/visual memory tip, an HSK $targetHskLevel example sentence, and up to 3 other visible objects in the scene."
+
+            val response = withTimeout(60_000L) {
+                cameraVisionModel.generateContent(
+                    content {
+                        image(scaled)
+                        text(prompt)
+                    }
+                )
+            }
+            val json = JSONObject(response.text ?: throw IllegalStateException("Empty vision response."))
+            val relArr = json.optJSONArray("relatedObjects")
+            val related = mutableListOf<ScannedSecondaryObject>()
+            if (relArr != null) {
+                for (i in 0 until relArr.length()) {
+                    val o = relArr.getJSONObject(i)
+                    val h = o.optString("hanzi", "").trim()
+                    if (h.isNotEmpty()) {
+                        related += ScannedSecondaryObject(
+                            hanzi = h,
+                            pinyin = o.optString("pinyin", ""),
+                            english = o.optString("english", "")
+                        )
+                    }
+                }
+            }
+            Result.success(
+                CameraPointLearnResult(
+                    hanzi = json.getString("hanzi"),
+                    pinyin = json.getString("pinyin"),
+                    english = json.getString("english"),
+                    hskLevel = json.optInt("hskLevel", targetHskLevel).coerceIn(1, 9),
+                    radicalTip = json.optString("radicalTip", ""),
+                    exampleHanzi = json.optString("exampleHanzi", ""),
+                    examplePinyin = json.optString("examplePinyin", ""),
+                    exampleEnglish = json.optString("exampleEnglish", ""),
+                    relatedObjects = related
+                )
+            )
+        } catch (e: TimeoutCancellationException) {
+            Log.e(AI_TAG, "Camera scan timed out", e)
+            Result.failure(Exception("Camera scan timed out after 60 seconds. Please try again."))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(AI_TAG, "Camera scan failed", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun transformGrammarPattern(
+        baseSentence: String,
+        transformationLabel: String,
+        transformationInstruction: String
+    ): Result<GrammarTransformResult> {
+        return try {
+            val prompt = "Transform this Mandarin base sentence: \"$baseSentence\". " +
+                "Requested transformation: $transformationLabel ($transformationInstruction). " +
+                "Return the transformed Simplified Chinese sentence, tone-marked Pinyin, English translation, " +
+                "highlighted list of exact tokens that moved or were added, and a clear explanation of the Mandarin grammar rule."
+
+            val response = withTimeout(60_000L) {
+                grammarTransformModel.generateContent(prompt)
+            }
+            val json = JSONObject(response.text ?: throw IllegalStateException("Empty grammar transform response."))
+            val changesArr = json.optJSONArray("highlightedChanges")
+            val changes = buildList {
+                if (changesArr != null) {
+                    for (i in 0 until changesArr.length()) {
+                        val s = changesArr.optString(i).trim()
+                        if (s.isNotEmpty()) add(s)
+                    }
+                }
+            }
+            Result.success(
+                GrammarTransformResult(
+                    baseSentence = baseSentence,
+                    transformationLabel = transformationLabel,
+                    transformedHanzi = json.getString("transformedHanzi"),
+                    transformedPinyin = json.optString("transformedPinyin", ""),
+                    transformedEnglish = json.optString("transformedEnglish", ""),
+                    highlightedChanges = changes,
+                    grammarExplanation = json.optString("grammarExplanation", "")
+                )
+            )
+        } catch (e: TimeoutCancellationException) {
+            Log.e(AI_TAG, "Grammar transform timed out", e)
+            Result.failure(Exception("Grammar transformation timed out after 60 seconds."))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(AI_TAG, "Grammar transform failed", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun generateSocraticMistakeHint(
+        promptEn: String,
+        userOrderHanzi: String,
+        expectedHanzi: String
+    ): Result<String> {
+        return try {
+            val prompt = "English meaning: \"$promptEn\". " +
+                "Learner arranged tiles as: \"$userOrderHanzi\". " +
+                "Target natural order: \"$expectedHanzi\". " +
+                "Give ONE short Socratic hint pointing out what is in the wrong position (e.g., time/place before verb, particle placement) so the learner can fix it themselves. Do NOT write out the full target sentence."
+            val response = withTimeout(45_000L) {
+                socraticHintModel.generateContent(prompt)
+            }
+            val hint = response.text?.trim()
+            if (hint.isNullOrBlank()) {
+                Result.failure(Exception("No hint returned."))
+            } else {
+                Result.success(hint)
+            }
+        } catch (e: TimeoutCancellationException) {
+            Log.e(AI_TAG, "Socratic hint timed out", e)
+            Result.failure(Exception("Hint request timed out."))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(AI_TAG, "Socratic hint failed", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun gradeShadowingAttempt(
+        targetScript: String,
+        targetPinyin: String,
+        recognizedSpeech: String,
+        hskLevel: Int
+    ): Result<ShadowingGradeResult> {
+        return try {
+            val prompt = "Grade a Mandarin shadowing reading attempt (HSK $hskLevel). " +
+                "Target script: \"$targetScript\" ($targetPinyin). " +
+                "Speech-to-text heard from learner: \"$recognizedSpeech\". " +
+                "Compare them carefully: score fluency/accuracy 0-100, flag any specific words or likely tone confusions (homophones with wrong tone), and give a warm 1-2 sentence coaching tip."
+            val response = withTimeout(60_000L) {
+                shadowingGraderModel.generateContent(prompt)
+            }
+            val json = JSONObject(response.text ?: throw IllegalStateException("Empty shadowing grade response."))
+            val arr = json.optJSONArray("flaggedWords")
+            val flagged = mutableListOf<ShadowingFlaggedWord>()
+            if (arr != null) {
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val w = o.optString("expectedWord", "").trim()
+                    if (w.isNotEmpty()) {
+                        flagged += ShadowingFlaggedWord(
+                            expectedWord = w,
+                            expectedPinyin = o.optString("expectedPinyin", ""),
+                            issue = o.optString("issue", "")
+                        )
+                    }
+                }
+            }
+            Result.success(
+                ShadowingGradeResult(
+                    fluencyScore = json.optInt("fluencyScore", 75).coerceIn(0, 100),
+                    verdict = json.optString("verdict", "Good Rhythm"),
+                    targetScript = targetScript,
+                    recognizedSpeech = recognizedSpeech,
+                    flaggedWords = flagged,
+                    coachingTip = json.optString("coachingTip", "")
+                )
+            )
+        } catch (e: TimeoutCancellationException) {
+            Log.e(AI_TAG, "Shadowing grading timed out", e)
+            Result.failure(Exception("Shadowing grading timed out after 60 seconds."))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(AI_TAG, "Shadowing grading failed", e)
             Result.failure(e)
         }
     }

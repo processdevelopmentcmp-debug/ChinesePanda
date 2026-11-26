@@ -59,15 +59,26 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.HskCurriculumData
+import com.example.data.MandarinDrillsData
 import com.example.model.UiState
 import com.example.ui.components.HskLevelPill
 import com.example.ui.components.PandaActionButton
+import com.example.ui.components.ToneColorLegendRow
+import com.example.ui.components.ToneColoredHanziPinyinBlock
 import com.example.ui.theme.CoralVermilion
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.GoldBright
 import com.example.ui.theme.HanziSerifFontFamily
+import com.example.ui.theme.IndigoAccent
+import com.example.ui.theme.JadeLightContainer
 import com.example.ui.theme.JadePrimary
 import com.example.viewmodel.PandaViewModel
+
+private enum class SentenceStudioMode(val label: String) {
+    TILE_BUILDER("Tile Builder"),
+    AI_GRADER("AI Grader"),
+    TRANSFORMER("Transformer")
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -75,7 +86,7 @@ fun SentenceStudioSection(viewModel: PandaViewModel) {
     val allVocab by viewModel.allVocab.collectAsStateWithLifecycle()
     val gradeState by viewModel.sentenceGradeState.collectAsStateWithLifecycle()
 
-    var modeA by remember { mutableStateOf(true) }
+    var activeMode by remember { mutableStateOf(SentenceStudioMode.TILE_BUILDER) }
 
     Column(
         modifier = Modifier
@@ -122,33 +133,31 @@ fun SentenceStudioSection(viewModel: PandaViewModel) {
             }
         }
 
-        // Mode A vs Mode B Switcher
+        // 3-Mode Switcher: Tile Builder | AI Grader | Grammar Transformer
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            FilterChip(
-                selected = modeA,
-                onClick = { modeA = true },
-                label = { Text("Mode A · Tile Builder") },
-                modifier = Modifier.weight(1f)
-            )
-            FilterChip(
-                selected = !modeA,
-                onClick = { modeA = false },
-                label = { Text("Mode B · AI Grader") },
-                modifier = Modifier.weight(1f)
-            )
+            SentenceStudioMode.entries.forEach { mode ->
+                FilterChip(
+                    selected = activeMode == mode,
+                    onClick = { activeMode = mode },
+                    label = { Text(mode.label, style = MaterialTheme.typography.labelMedium) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("sentence_mode_${mode.name.lowercase()}")
+                )
+            }
         }
 
-        if (modeA) {
-            GuidedTileBuilderCard(viewModel = viewModel)
-        } else {
-            FreeAiSentenceCard(
+        when (activeMode) {
+            SentenceStudioMode.TILE_BUILDER -> GuidedTileBuilderCard(viewModel = viewModel)
+            SentenceStudioMode.AI_GRADER -> FreeAiSentenceCard(
                 viewModel = viewModel,
                 allVocab = allVocab,
                 gradeState = gradeState
             )
+            SentenceStudioMode.TRANSFORMER -> GrammarPatternTransformerCard(viewModel = viewModel)
         }
     }
 }
@@ -168,6 +177,9 @@ private fun GuidedTileBuilderCard(viewModel: PandaViewModel) {
     }
     val placedIndices = remember(index) { mutableStateListOf<Int>() }
     var checkResult by remember(index) { mutableStateOf<Boolean?>(null) }
+
+    val socraticHintState by viewModel.socraticHintState.collectAsStateWithLifecycle()
+    var revealAnswer by remember(index) { mutableStateOf(false) }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -189,7 +201,10 @@ private fun GuidedTileBuilderCard(viewModel: PandaViewModel) {
                     TextButton(onClick = { showPinyin = !showPinyin }) {
                         Text(if (showPinyin) "Pinyin: ON" else "Pinyin: OFF")
                     }
-                    TextButton(onClick = { index = (index + 1) % sentences.size }) {
+                    TextButton(onClick = {
+                        index = (index + 1) % sentences.size
+                        viewModel.clearSocraticHint()
+                    }) {
                         Text("Next →")
                     }
                 }
@@ -262,6 +277,8 @@ private fun GuidedTileBuilderCard(viewModel: PandaViewModel) {
                         poolIndices.addAll(item.tiles.indices.shuffled())
                         placedIndices.clear()
                         checkResult = null
+                        revealAnswer = false
+                        viewModel.clearSocraticHint()
                     },
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.height(48.dp)
@@ -276,8 +293,16 @@ private fun GuidedTileBuilderCard(viewModel: PandaViewModel) {
                         val ok = constructed == item.correctHanzi
                         checkResult = ok
                         if (ok) {
+                            viewModel.clearSocraticHint()
                             viewModel.awardXp(20L, null, "Perfect SVO sentence!")
                             viewModel.speakChinese(item.correctHanzi)
+                        } else if (constructed.isNotBlank()) {
+                            // Automatically ask Gemini Socratic Mistake Explainer for a 1-sentence hint!
+                            viewModel.requestSocraticHint(
+                                promptEn = item.promptEn,
+                                userOrderHanzi = constructed,
+                                expectedHanzi = item.correctHanzi
+                            )
                         }
                     },
                     modifier = Modifier
@@ -286,23 +311,87 @@ private fun GuidedTileBuilderCard(viewModel: PandaViewModel) {
                 )
             }
 
-            if (checkResult != null) {
+            if (checkResult == true) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
-                    color = if (checkResult == true) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer
+                    color = MaterialTheme.colorScheme.primaryContainer
                 ) {
                     Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            text = if (checkResult == true) "Perfect! ${item.correctHanzi}" else "Expected: ${item.correctHanzi}",
+                            text = "Perfect! ${item.correctHanzi}",
                             style = MaterialTheme.typography.titleSmall,
-                            color = if (checkResult == true) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                         Text(
                             text = item.grammarNote,
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (checkResult == true) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
+                    }
+                }
+            } else if (checkResult == false) {
+                // Socratic Mistake Explainer Card (guides retry without spoiling answer immediately)
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("socratic_hint_card"),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = IndigoAccent, modifier = Modifier.size(16.dp))
+                                Text(
+                                    text = "Socratic Mistake Hint",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = IndigoAccent
+                                )
+                            }
+                            TextButton(onClick = { revealAnswer = !revealAnswer }) {
+                                Text(if (revealAnswer) "Hide Answer" else "Show Answer")
+                            }
+                        }
+
+                        when (val hintState = socraticHintState) {
+                            is UiState.Loading -> {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = IndigoAccent)
+                                    Text("Analyzing your word order...", style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                            is UiState.Success -> {
+                                Text(
+                                    text = hintState.data,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                            is UiState.Error -> {
+                                Text(
+                                    text = item.grammarNote,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                            null -> Unit
+                        }
+
+                        if (revealAnswer) {
+                            Text(
+                                text = "Target order: ${item.correctHanzi}",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = JadePrimary
+                            )
+                        }
                     }
                 }
             }
@@ -533,3 +622,239 @@ private fun FreeAiSentenceCard(
         }
     }
 }
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GrammarPatternTransformerCard(viewModel: PandaViewModel) {
+    val transformState by viewModel.grammarTransformState.collectAsStateWithLifecycle()
+    var baseSentence by remember { mutableStateOf(MandarinDrillsData.grammarTransformStarterSentences.first().first) }
+    var activePatternLabel by remember { mutableStateOf("") }
+
+    val transformations = remember {
+        listOf(
+            Triple("Past · 了", "Convert to completed past tense using 了 (le).", JadePrimary),
+            Triple("Negative · 没/不", "Convert to natural Mandarin negative using 没 (méi) or 不 (bù).", CoralVermilion),
+            Triple("Question · 吗", "Convert into a polite yes/no question using 吗 (ma).", IndigoAccent),
+            Triple("Time Before Verb", "Add a time phrase like 明天 or 昨天 in proper Mandarin Subject + Time + Verb order.", GoldAccent),
+            Triple("Place Before Verb", "Add a location phrase using 在 (zài) + Place BEFORE the verb.", JadePrimary),
+            Triple("把 Structure", "Rewrite using the HSK 把 (bǎ) disposal structure: Subject + 把 + Object + Verb + Result.", IndigoAccent)
+        )
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("grammar_transformer_card"),
+        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.5.dp, IndigoAccent.copy(alpha = 0.55f))
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = IndigoAccent)
+                Column {
+                    Text(
+                        text = "HSK Grammar Pattern Transformer",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Pick or type a base sentence and tap a grammar transformation — Gemini shows what moved and why.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Starter Base Sentences
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                MandarinDrillsData.grammarTransformStarterSentences.forEach { (zh, en) ->
+                    FilterChip(
+                        selected = baseSentence == zh,
+                        onClick = {
+                            baseSentence = zh
+                            viewModel.clearGrammarTransform()
+                        },
+                        label = { Text("$zh ($en)", style = MaterialTheme.typography.labelSmall) }
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = baseSentence,
+                onValueChange = { baseSentence = it },
+                label = { Text("Base Chinese sentence (e.g. 我吃苹果)") },
+                singleLine = true,
+                trailingIcon = {
+                    IconButton(onClick = { if (baseSentence.isNotBlank()) viewModel.speakChinese(baseSentence) }) {
+                        Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = "Listen base sentence", tint = JadePrimary)
+                    }
+                },
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("grammar_transformer_input")
+            )
+
+            Text(
+                text = "Tap a transformation:",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // 6 Transformation Action Buttons (2 rows of 3)
+            transformations.chunked(2).forEach { rowItems ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    rowItems.forEach { (label, instruction, accent) ->
+                        val isActive = activePatternLabel == label
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(14.dp))
+                                .clickable(enabled = transformState !is UiState.Loading && baseSentence.isNotBlank()) {
+                                    activePatternLabel = label
+                                    viewModel.transformGrammarPattern(
+                                        baseSentence = baseSentence,
+                                        label = label,
+                                        instruction = instruction
+                                    )
+                                }
+                                .testTag("transform_btn_${label.take(4).lowercase()}"),
+                            shape = RoundedCornerShape(14.dp),
+                            color = if (isActive) accent else accent.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, accent.copy(alpha = 0.6f))
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isActive) Color.White else accent,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            when (val st = transformState) {
+                is UiState.Loading -> {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 10.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = IndigoAccent)
+                        Spacer(Modifier.width(10.dp))
+                        Text("Transforming \"$baseSentence\" into $activePatternLabel...", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                is UiState.Error -> {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.errorContainer
+                    ) {
+                        Text(
+                            text = st.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+                is UiState.Success -> {
+                    val result = st.data
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("grammar_transformer_result"),
+                        shape = RoundedCornerShape(18.dp),
+                        color = JadeLightContainer.copy(alpha = 0.55f),
+                        border = BorderStroke(1.5.dp, JadePrimary)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = result.transformationLabel,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = JadePrimary
+                                )
+                                IconButton(onClick = { viewModel.speakChinese(result.transformedHanzi) }) {
+                                    Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = "Listen transformed sentence", tint = JadePrimary)
+                                }
+                            }
+
+                            ToneColoredHanziPinyinBlock(
+                                hanzi = result.transformedHanzi,
+                                pinyin = result.transformedPinyin,
+                                hanziFontSize = 24.sp
+                            )
+
+                            Text(
+                                text = "\"${result.transformedEnglish}\"",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+
+                            if (result.highlightedChanges.isNotEmpty()) {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    result.highlightedChanges.forEach { change ->
+                                        Surface(
+                                            shape = RoundedCornerShape(50),
+                                            color = IndigoAccent.copy(alpha = 0.14f)
+                                        ) {
+                                            Text(
+                                                text = change,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = IndigoAccent,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Text(
+                                text = result.grammarExplanation,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+
+                            ToneColorLegendRow()
+                        }
+                    }
+                }
+                null -> Unit
+            }
+        }
+    }
+}
+

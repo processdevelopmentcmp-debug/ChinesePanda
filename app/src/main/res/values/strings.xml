@@ -9,6 +9,7 @@
     <string name="nav_practice">Practice</string>
     <string name="nav_review">Review</string>
     <string name="nav_teacher">AI Teacher</string>
+    <string name="nav_write_stroke">Write ✍️</string>
     <string name="cd_panda_mascot">Panda Laoshi mascot</string>
     <string name="cd_play_audio">Play Chinese pronunciation</string>
     <string name="cd_record_speech">Record your Chinese speech</string>
@@ -39,4 +40,9 @@
     <string name="font_size_reset">Reset 100%</string>
     <string name="daily_tracker_title">Daily Learning Tracker</string>
     <string name="word_of_the_day_label">WORD OF THE DAY</string>
+    <string name="daily_word_goal_title">Daily Word Goal</string>
+    <string name="daily_word_goal_subtitle">Define how many new HSK words or Hanzi to acquire each day</string>
+    <string name="cd_edit_word_goal">Edit daily word acquisition goal</string>
+    <string name="profile_achievements_title">Profile &amp; Achievements</string>
+    <string name="profile_achievements_subtitle">HSK 3.0 mastery badges &amp; milestones</string>
 </resources>

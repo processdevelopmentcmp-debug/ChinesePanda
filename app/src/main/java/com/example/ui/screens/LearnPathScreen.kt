@@ -65,6 +65,7 @@ import com.example.model.LearningUnit
 import com.example.model.LessonQuestion
 import com.example.model.UiState
 import com.example.model.UserProfile
+import com.example.ui.components.HskBadgesMiniStripCard
 import com.example.ui.components.PandaActionButton
 import com.example.ui.theme.CoralVermilion
 import com.example.ui.theme.GoldAccent
@@ -82,7 +83,10 @@ import java.util.Locale
 fun LearnPathScreen(
     viewModel: PandaViewModel,
     profile: UserProfile,
-    onOpenDailyTracker: () -> Unit = {}
+    onOpenDailyTracker: () -> Unit = {},
+    onOpenWordGoalSetter: () -> Unit = {},
+    onOpenLearnedVault: () -> Unit = {},
+    onOpenProfilePage: () -> Unit = {}
 ) {
     val bonusState by viewModel.bonusExerciseState.collectAsStateWithLifecycle()
     val learnMode by viewModel.learnMode.collectAsStateWithLifecycle()
@@ -101,11 +105,15 @@ fun LearnPathScreen(
     val activeVocabLesson by viewModel.activeVocabLesson.collectAsStateWithLifecycle()
     val activeLessonAnatomy by viewModel.activeLessonWordAnatomy.collectAsStateWithLifecycle()
     val dailyTracker by viewModel.dailyTracker.collectAsStateWithLifecycle()
+    val hskProfileShowcase by viewModel.hskProfileShowcase.collectAsStateWithLifecycle()
     val wordOfTheDay by viewModel.wordOfTheDay.collectAsStateWithLifecycle()
     val focusTimerRunning by viewModel.focusTimerRunning.collectAsStateWithLifecycle()
     val focusTimerRemainingSec by viewModel.focusTimerRemainingSec.collectAsStateWithLifecycle()
+    val learnedEntries by viewModel.learnedWordEntries.collectAsStateWithLifecycle()
+    val activeShortcutQuiz by viewModel.activeShortcutQuiz.collectAsStateWithLifecycle()
 
     var activeCoreUnit by remember { mutableStateOf<LearningUnit?>(null) }
+    val dueAnkiCount = remember(learnedEntries) { learnedEntries.count { it.isDue } }
 
     // 1. Active 4-Stage Interactive Vocabulary Lesson Runner
     if (activeVocabLesson != null) {
@@ -201,6 +209,7 @@ fun LearnPathScreen(
         )
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -240,7 +249,20 @@ fun LearnPathScreen(
                 snapshot = dailyTracker,
                 focusTimerRunning = focusTimerRunning,
                 focusTimerRemainingSec = focusTimerRemainingSec,
-                onOpenFullTracker = onOpenDailyTracker
+                onOpenFullTracker = onOpenDailyTracker,
+                onOpenWordGoalSetter = onOpenWordGoalSetter,
+                onStartDailyGoalLesson = { viewModel.startDailyWordGoalSession() }
+            )
+        }
+
+        // Visual HSK 3.0 Progress Badges Mini Strip
+        item(key = "hsk_badges_strip") {
+            HskBadgesMiniStripCard(
+                showcase = hskProfileShowcase,
+                onOpenProfileBadges = onOpenProfilePage,
+                onSelectBadgeLevel = { levelKey ->
+                    viewModel.jumpToHskLevelInLearn(levelKey)
+                }
             )
         }
 
@@ -251,7 +273,8 @@ fun LearnPathScreen(
                 onSpeak = { text, speed -> viewModel.speakChinese(text, speed) },
                 onOpenBreakdown = { word -> viewModel.openWordBreakdown(word) },
                 onAddSrs = { word -> viewModel.addWordToSrs(word) },
-                onWriteWord = { word -> viewModel.jumpToWriteWord(word) }
+                onWriteWord = { word -> viewModel.jumpToWriteWord(word) },
+                onMarkLearned = { word -> viewModel.markWordAcquiredToday(word) }
             )
         }
 
@@ -536,6 +559,29 @@ fun LearnPathScreen(
                 }
             }
 
+            LearnTabMode.SKILL_TREE -> {
+                item(key = "visual_skill_tree") {
+                    VisualSkillTreeSection(
+                        completedLessonIds = completedVocabLessons,
+                        learnedWordsCount = learnedEntries.size,
+                        onTapSkillNode = { node ->
+                            viewModel.startSkillTreeNodeLesson(
+                                nodeId = node.id,
+                                title = node.title,
+                                topicId = node.topicId,
+                                minHsk = node.minHsk,
+                                maxHsk = node.maxHsk
+                            )
+                        },
+                        onTapStoriesMilestone = { viewModel.selectNavTab(3) },
+                        onTapShortcut = { targetLevel ->
+                            viewModel.startShortcutPlacementQuiz(targetLevel)
+                        },
+                        onOpenLearnedVault = onOpenLearnedVault
+                    )
+                }
+            }
+
             LearnTabMode.CORE_PATH -> {
                 item(key = "core_header") {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -579,6 +625,63 @@ fun LearnPathScreen(
                 }
             }
         }
+    }
+
+    // HelloChinese-inspired Floating Anki Review Bubble with live due count badge
+    Box(
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(end = 16.dp, bottom = 16.dp)
+    ) {
+        Surface(
+            onClick = { viewModel.startDueAnkiReview() },
+            shape = CircleShape,
+            color = GoldBright,
+            shadowElevation = 6.dp,
+            border = BorderStroke(2.dp, Color.White),
+            modifier = Modifier
+                .size(58.dp)
+                .testTag("floating_anki_review_bubble")
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Rounded.School,
+                    contentDescription = "Quick Anki review",
+                    tint = Color(0xFF4A3100),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+        if (dueAnkiCount > 0) {
+            Surface(
+                shape = CircleShape,
+                color = CoralVermilion,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(24.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = if (dueAnkiCount > 99) "99" else "$dueAnkiCount",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+            }
+        }
+    }
+    }
+
+    if (activeShortcutQuiz != null) {
+        ShortcutPlacementQuizDialog(
+            quiz = activeShortcutQuiz!!,
+            onSpeak = { viewModel.speakChinese(it) },
+            onFinish = { passed ->
+                viewModel.completeShortcutQuiz(activeShortcutQuiz!!.targetHskLevel, passed)
+            },
+            onDismiss = { viewModel.dismissShortcutQuiz() }
+        )
     }
 
     // AI Bonus Exercise Dialog

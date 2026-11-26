@@ -325,15 +325,16 @@ fun LearnModeSegmentedBar(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
     ) {
-        Row(
-            modifier = Modifier.padding(4.dp),
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            LearnTabMode.entries.forEach { mode ->
+            items(LearnTabMode.entries, key = { it.name }) { mode ->
                 val active = mode == selectedMode
                 Surface(
                     modifier = Modifier
-                        .weight(1f)
                         .heightIn(min = 44.dp)
                         .clip(RoundedCornerShape(14.dp))
                         .clickable { onSelectMode(mode) }
@@ -343,7 +344,7 @@ fun LearnModeSegmentedBar(
                     tonalElevation = if (active) 2.dp else 0.dp
                 ) {
                     Box(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(

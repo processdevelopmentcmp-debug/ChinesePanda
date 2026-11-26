@@ -8,31 +8,56 @@ import com.example.data.AppDisplayPrefs
 import com.example.data.DailyLearningTrackerRepository
 import com.example.data.HanziEtymologyRepository
 import com.example.data.HskCurriculumData
+import com.example.data.HskMockExamGenerator
 import com.example.data.HskVocabularyRepository
 import com.example.data.PandaAiRepository
 import com.example.data.PandaFirestoreRepository
 import com.example.data.local.CharacterAnatomy
 import com.example.data.local.DailyTrackerDateUtil
 import com.example.data.local.DailyTrackerSnapshot
+import com.example.data.local.DailyWordGoalCalculator
+import com.example.data.local.DailyWordGoalUnit
 import com.example.data.local.HskCatalogSyncState
 import com.example.data.local.HskLevelSummary
 import com.example.data.local.HskVocabularyFilter
 import com.example.data.local.WordEtymologyStory
+import android.graphics.Bitmap
+import com.example.model.ActiveAnkiSession
+import com.example.model.ActiveMockExamSession
+import com.example.model.ActiveShortcutQuiz
 import com.example.model.AiChatMessage
 import com.example.model.AiSentenceGrade
+import com.example.model.CameraPointLearnResult
 import com.example.model.CustomWordDoc
 import com.example.model.GradedStory
+import com.example.model.GrammarTransformResult
+import com.example.model.ShadowingGradeResult
 import com.example.model.GroundedSource
+import com.example.model.HskBadgeCalculator
+import com.example.model.HskMockExamMode
+import com.example.model.HskMockLevel
+import com.example.model.HskProfileShowcase
+import com.example.model.LearnedWordEntry
 import com.example.model.LessonQuestion
 import com.example.model.LiveVoiceState
+import com.example.model.MockExamMistakeItem
+import com.example.model.MockExamReport
+import com.example.model.MockExamSection
+import com.example.model.MockQuestionAnswer
+import com.example.model.MockQuestionKind
+import com.example.model.PastMockExamRecord
 import com.example.model.SavedStoryDoc
+import com.example.model.ShortcutQuizQuestion
 import com.example.model.Sm2Calculator
 import com.example.model.SrsCardDoc
+import com.example.model.SynonymBattleItem
 import com.example.model.TopicCategory
 import com.example.model.TutorMode
 import com.example.model.UiState
 import com.example.model.UserProfile
 import com.example.model.VocabWord
+import com.example.model.WordStrength
+import com.example.model.WordStrengthFilter
 import com.google.firebase.firestore.FirebaseFirestoreException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -41,6 +66,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -57,16 +83,22 @@ private const val VM_TAG = "PandaViewModel"
 private const val STOP_TIMEOUT_MS = 5000L
 
 enum class PracticeStudioTab(val label: String) {
+    HUB("Hub"),
     WRITE("Write"),
     SPEAK("Speak"),
     LISTENING("Listening"),
     SENTENCES("Sentences"),
-    RADICALS("Radicals")
+    CLOZE("Cloze"),
+    RADICALS("Radicals"),
+    SCANNER("Scan"),
+    MOCK_EXAM("Mock Exam"),
+    MEASURE_SYNONYMS("Measure & PK")
 }
 
 enum class LearnTabMode(val label: String) {
     HSK_BY_HSK("HSK by HSK"),
     TOPIC_BY_TOPIC("Topic by Topic"),
+    SKILL_TREE("Skill Tree"),
     CORE_PATH("Core Path")
 }
 
@@ -269,6 +301,7 @@ class PandaViewModel(
     // --- RICH LEARN TAB: HSK-BY-HSK & TOPIC-BY-TOPIC LESSON COURSE ---
 
     private val progressPrefKey = "completed_vocab_lessons_$currentUserId"
+    private val learnedWordsPrefKey = "learned_word_hanzi_$currentUserId"
 
     private val _learnMode = MutableStateFlow(LearnTabMode.HSK_BY_HSK)
     val learnMode: StateFlow<LearnTabMode> = _learnMode.asStateFlow()
@@ -287,8 +320,35 @@ class PandaViewModel(
     )
     val completedVocabLessonIds: StateFlow<Set<String>> = _completedVocabLessonIds.asStateFlow()
 
+    private val _learnedWordHanzi = MutableStateFlow(
+        progressPrefs?.getStringSet(learnedWordsPrefKey, emptySet())?.toSet() ?: emptySet()
+    )
+    val learnedWordHanzi: StateFlow<Set<String>> = _learnedWordHanzi.asStateFlow()
+
     private val _activeVocabLesson = MutableStateFlow<ActiveVocabLesson?>(null)
     val activeVocabLesson: StateFlow<ActiveVocabLesson?> = _activeVocabLesson.asStateFlow()
+
+    private val _activeAnkiSession = MutableStateFlow<ActiveAnkiSession?>(null)
+    val activeAnkiSession: StateFlow<ActiveAnkiSession?> = _activeAnkiSession.asStateFlow()
+
+    private val _activeShortcutQuiz = MutableStateFlow<ActiveShortcutQuiz?>(null)
+    val activeShortcutQuiz: StateFlow<ActiveShortcutQuiz?> = _activeShortcutQuiz.asStateFlow()
+
+    // --- HSK 3.0 MOCK EXAM SIMULATOR STATE (persisted in SharedPreferences — zero Room changes) ---
+    private val mockExamHistoryPrefKey = "hsk_mock_exam_history_${currentUserId}"
+    private val _mockExamSession = MutableStateFlow<ActiveMockExamSession?>(null)
+    val mockExamSession: StateFlow<ActiveMockExamSession?> = _mockExamSession.asStateFlow()
+
+    private val _mockExamReport = MutableStateFlow<MockExamReport?>(null)
+    val mockExamReport: StateFlow<MockExamReport?> = _mockExamReport.asStateFlow()
+
+    private val _isGradingMockExam = MutableStateFlow(false)
+    val isGradingMockExam: StateFlow<Boolean> = _isGradingMockExam.asStateFlow()
+
+    private val _pastMockExams = MutableStateFlow(
+        HskMockExamGenerator.deserializeHistory(progressPrefs?.getString(mockExamHistoryPrefKey, null))
+    )
+    val pastMockExams: StateFlow<List<PastMockExamRecord>> = _pastMockExams.asStateFlow()
 
     // Instant offline character decomposition map (hanzi -> CharacterAnatomy list) for active lesson cards
     private val _activeLessonWordAnatomy = MutableStateFlow<Map<String, List<CharacterAnatomy>>>(emptyMap())
@@ -393,12 +453,94 @@ class PandaViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), HskCurriculumData.builtInStories)
 
+    // Combined "Learned So Far" word list (SRS cards + completed lesson words) with Weak/Medium/Strong strength
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val learnedWordEntries: StateFlow<List<LearnedWordEntry>> = combine(
+        srsCardsState,
+        _learnedWordHanzi,
+        allVocab
+    ) { srsUi, localLearnedSet, featured ->
+        Triple((srsUi as? UiState.Success)?.data.orEmpty(), localLearnedSet, featured)
+    }.flatMapLatest { (srsCards, localLearnedSet, featured) ->
+        kotlinx.coroutines.flow.flow {
+            val nowMs = System.currentTimeMillis()
+            val featuredByHanzi = featured.associateBy { it.hanzi }
+            val srsByHanzi = srsCards.associateBy { it.hanzi }
+            val allHanzi = (srsByHanzi.keys + localLearnedSet).toSet()
+            val missingFromFeatured = allHanzi.filterNot { it in featuredByHanzi }.toSet()
+            val dbLookup = if (missingFromFeatured.isNotEmpty()) {
+                vocabRepo.getWordsByHanziList(missingFromFeatured).associateBy { it.hanzi }
+            } else emptyMap()
+
+            val entries = allHanzi.mapNotNull { hanzi ->
+                val srs = srsByHanzi[hanzi]
+                val vocab = featuredByHanzi[hanzi]
+                    ?: dbLookup[hanzi]
+                    ?: srs?.let {
+                        VocabWord(
+                            key = it.wordKey,
+                            hanzi = it.hanzi,
+                            pinyin = it.pinyin,
+                            english = it.english,
+                            hskLevel = it.hskLevel.toInt().coerceIn(1, 9),
+                            topicId = 1,
+                            writable = true,
+                            exampleHanzi = it.exampleHanzi
+                        )
+                    }
+                if (vocab == null) return@mapNotNull null
+                val strength = classifyWordStrength(srs)
+                val isDue = srs == null || srs.nextReviewEpochMs <= nowMs
+                LearnedWordEntry(
+                    word = vocab,
+                    srsCard = srs,
+                    strength = strength,
+                    isDue = isDue
+                )
+            }.sortedWith(
+                compareBy<LearnedWordEntry> { it.strength.ordinal }
+                    .thenBy { it.word.hskLevel }
+                    .thenBy { it.word.topicId }
+            )
+            emit(entries)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+
+    val hskProfileShowcase: StateFlow<HskProfileShowcase> = combine(
+        profileState,
+        learnedWordEntries,
+        hskLevelSummaries,
+        dailyTracker,
+        _completedVocabLessonIds
+    ) { profileUi, learnedEntries, summaries, tracker, completedLessonIds ->
+        val resolvedProfile = (profileUi as? UiState.Success)?.data ?: UserProfile(
+            id = currentUserId,
+            userId = currentUserId,
+            displayName = initialDisplayName
+        )
+        HskBadgeCalculator.buildShowcase(
+            profile = resolvedProfile,
+            learnedEntries = learnedEntries,
+            levelSummaries = summaries,
+            dailyTracker = tracker,
+            completedVocabLessonIds = completedLessonIds
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), HskProfileShowcase())
+
+    fun jumpToHskLevelInLearn(levelKey: String) {
+        _learnMode.value = LearnTabMode.HSK_BY_HSK
+        _learnHskLevel.value = levelKey
+        _learnTopicId.value = null
+        _learnChapterIndex.value = 0
+        _selectedNavIndex.value = 0
+    }
+
     // --- UI STATE & NAVIGATION HANDOFFS ---
 
     private val _selectedNavIndex = MutableStateFlow(0)
     val selectedNavIndex: StateFlow<Int> = _selectedNavIndex.asStateFlow()
 
-    private val _activePracticeStudio = MutableStateFlow(PracticeStudioTab.WRITE)
+    private val _activePracticeStudio = MutableStateFlow(PracticeStudioTab.HUB)
     val activePracticeStudio: StateFlow<PracticeStudioTab> = _activePracticeStudio.asStateFlow()
 
     private val _activeWriteWord = MutableStateFlow(
@@ -464,6 +606,18 @@ class PandaViewModel(
 
     private val _bonusExerciseState = MutableStateFlow<UiState<LessonQuestion>?>(null)
     val bonusExerciseState: StateFlow<UiState<LessonQuestion>?> = _bonusExerciseState.asStateFlow()
+
+    private val _cameraScanState = MutableStateFlow<UiState<CameraPointLearnResult>?>(null)
+    val cameraScanState: StateFlow<UiState<CameraPointLearnResult>?> = _cameraScanState.asStateFlow()
+
+    private val _grammarTransformState = MutableStateFlow<UiState<GrammarTransformResult>?>(null)
+    val grammarTransformState: StateFlow<UiState<GrammarTransformResult>?> = _grammarTransformState.asStateFlow()
+
+    private val _socraticHintState = MutableStateFlow<UiState<String>?>(null)
+    val socraticHintState: StateFlow<UiState<String>?> = _socraticHintState.asStateFlow()
+
+    private val _shadowingGradeState = MutableStateFlow<UiState<ShadowingGradeResult>?>(null)
+    val shadowingGradeState: StateFlow<UiState<ShadowingGradeResult>?> = _shadowingGradeState.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -543,6 +697,7 @@ class PandaViewModel(
                 _learnTopicId.value = null
                 _learnHskLevel.value = "ALL"
             }
+            LearnTabMode.SKILL_TREE -> Unit
             LearnTabMode.CORE_PATH -> Unit
         }
     }
@@ -641,22 +796,258 @@ class PandaViewModel(
     }
 
     fun completeVocabLesson(lessonId: String, title: String, earnedXp: Int) {
-        val wordsCount = _activeVocabLesson.value?.words?.size ?: 10
+        val activeWords = _activeVocabLesson.value?.words.orEmpty()
         val updated = _completedVocabLessonIds.value + lessonId
         _completedVocabLessonIds.value = updated
         progressPrefs?.edit()?.putStringSet(progressPrefKey, updated)?.apply()
+        val newlyAcquired = markWordsAsLearned(activeWords.map { it.hanzi })
         _activeVocabLesson.value = null
         recordDailyActivity(
-            wordsDelta = wordsCount,
             lessonsDelta = 1,
             minutesDelta = 3
         )
+        val newSummary = if (newlyAcquired.isNotEmpty()) {
+            " · +${newlyAcquired.size} new HSK word(s) today!"
+        } else {
+            ""
+        }
         // Award XP in Firestore without overflowing the 50-item Core Path completedUnitIds cap
-        awardXp(earnedXp.toLong(), completedUnitId = null, reason = "Completed $title")
+        awardXp(earnedXp.toLong(), completedUnitId = null, reason = "Completed $title$newSummary")
     }
 
     fun dismissVocabLesson() {
         _activeVocabLesson.value = null
+    }
+
+    // --- LEARNED SO FAR, ANKI-STYLE REVIEW & VISUAL SKILL TREE ---
+
+    private fun classifyWordStrength(srs: SrsCardDoc?): WordStrength {
+        if (srs == null) return WordStrength.MEDIUM
+        return when {
+            srs.lapses >= 1L || srs.repetitions == 0L || srs.easeFactor < 2.15 -> WordStrength.WEAK
+            srs.repetitions >= 3L && srs.intervalDays >= 6L -> WordStrength.STRONG
+            else -> WordStrength.MEDIUM
+        }
+    }
+
+    private fun markWordsAsLearned(hanziList: Collection<String>): List<String> {
+        val clean = hanziList.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        if (clean.isEmpty()) return emptyList()
+        val previous = _learnedWordHanzi.value
+        val newlyAdded = clean.filter { it !in previous }
+        if (newlyAdded.isNotEmpty()) {
+            val updated = previous + newlyAdded
+            _learnedWordHanzi.value = updated
+            progressPrefs?.edit()?.putStringSet(learnedWordsPrefKey, updated)?.apply()
+            viewModelScope.launch {
+                runCatching {
+                    trackerRepo.recordNewWordsAcquired(currentUserId, newlyAdded)
+                }.onFailure { err ->
+                    Log.w(VM_TAG, "Failed to log newly acquired words", err)
+                }
+            }
+        }
+        return newlyAdded
+    }
+
+    fun startAnkiReview(title: String, subtitle: String, entries: List<LearnedWordEntry>) {
+        if (entries.isEmpty()) {
+            _snackbarMessage.value = "No words match this selection yet — complete a lesson or select topics!"
+            return
+        }
+        _activeAnkiSession.value = ActiveAnkiSession(
+            id = "anki_${System.currentTimeMillis()}",
+            title = title,
+            subtitle = subtitle,
+            entries = entries
+        )
+    }
+
+    fun startDueAnkiReview() {
+        val entries = learnedWordEntries.value
+        val due = entries.filter { it.isDue }.ifEmpty { entries }
+        if (due.isEmpty()) {
+            val starterEntries = allVocab.value.take(10).map {
+                LearnedWordEntry(word = it, srsCard = null, strength = WordStrength.WEAK, isDue = true)
+            }
+            startAnkiReview(
+                title = "Anki Quick Review",
+                subtitle = "Starter HSK words · Spaced Repetition",
+                entries = starterEntries
+            )
+        } else {
+            startAnkiReview(
+                title = "Anki Due Review",
+                subtitle = "${due.size} card(s) ready for spaced repetition",
+                entries = due
+            )
+        }
+    }
+
+    fun startTopicAnkiReview(
+        topicIds: List<Int>,
+        title: String,
+        onlyLearned: Boolean,
+        strengthFilter: WordStrengthFilter = WordStrengthFilter.ALL
+    ) {
+        if (topicIds.isEmpty()) {
+            _snackbarMessage.value = "Select at least one topic to review."
+            return
+        }
+        viewModelScope.launch {
+            val srsByHanzi = ((srsCardsState.value as? UiState.Success)?.data.orEmpty()).associateBy { it.hanzi }
+            val nowMs = System.currentTimeMillis()
+
+            val entries = if (onlyLearned) {
+                learnedWordEntries.value
+                    .filter { it.word.topicId in topicIds }
+                    .filter { entry ->
+                        when (strengthFilter) {
+                            WordStrengthFilter.ALL -> true
+                            WordStrengthFilter.WEAK -> entry.strength == WordStrength.WEAK
+                            WordStrengthFilter.MEDIUM -> entry.strength == WordStrength.MEDIUM
+                            WordStrengthFilter.STRONG -> entry.strength == WordStrength.STRONG
+                        }
+                    }
+            } else {
+                val words = vocabRepo.getWordsForTopics(topicIds, limit = 30)
+                words.map { w ->
+                    val srs = srsByHanzi[w.hanzi]
+                    LearnedWordEntry(
+                        word = w,
+                        srsCard = srs,
+                        strength = if (srs != null) classifyWordStrength(srs) else WordStrength.WEAK,
+                        isDue = srs == null || srs.nextReviewEpochMs <= nowMs
+                    )
+                }
+            }
+
+            if (entries.isEmpty()) {
+                _snackbarMessage.value = if (onlyLearned) {
+                    "No learned words in selected topics with this filter yet. Switch to 'All Topic Words' to practice!"
+                } else {
+                    "No words found for selected topics."
+                }
+            } else {
+                startAnkiReview(
+                    title = title,
+                    subtitle = "${entries.size} card(s) · Anki SM-2 Spaced Repetition",
+                    entries = entries
+                )
+            }
+        }
+    }
+
+    fun rateAnkiCard(entry: LearnedWordEntry, quality: Int) {
+        if (quality >= 3) {
+            markWordsAsLearned(listOf(entry.word.hanzi))
+        }
+        viewModelScope.launch {
+            val existingCards = (srsCardsState.value as? UiState.Success)?.data.orEmpty()
+            val matchedCard = entry.srsCard ?: existingCards.firstOrNull { it.hanzi == entry.word.hanzi }
+            if (matchedCard != null) {
+                submitSrsReview(matchedCard, quality)
+            } else {
+                // Upsert the word into SM-2 deck first, then apply the Anki rating
+                val upsertRes = firestoreRepo.upsertSrsCard(currentUserId, entry.word)
+                val sm2 = Sm2Calculator.calculate(
+                    quality = quality,
+                    currentReps = 0,
+                    currentInterval = 1,
+                    currentEase = 2.5,
+                    currentLapses = 0
+                )
+                if (upsertRes.isSuccess) {
+                    val safeCardId = firestoreRepo.buildSafeSrsDocId(entry.word.key)
+                    firestoreRepo.updateSrsReview(currentUserId, safeCardId, sm2, null)
+                }
+                recordDailyActivity(
+                    xpDelta = if (quality >= 3) 15 else 0,
+                    srsDelta = 1,
+                    minutesDelta = 1
+                )
+                if (quality >= 3) {
+                    firestoreRepo.awardXpAndUnit(currentUserId, 15L)
+                }
+            }
+        }
+    }
+
+    fun dismissAnkiSession() {
+        _activeAnkiSession.value = null
+    }
+
+    fun startSkillTreeNodeLesson(
+        nodeId: String,
+        title: String,
+        topicId: Int,
+        minHsk: Int,
+        maxHsk: Int
+    ) {
+        viewModelScope.launch {
+            val words = vocabRepo.getWordsForTopicNode(
+                topicId = topicId,
+                minHsk = minHsk,
+                maxHsk = maxHsk,
+                limit = 10
+            )
+            if (words.isEmpty()) {
+                _snackbarMessage.value = "Syncing vocabulary for $title — try again in a moment."
+                return@launch
+            }
+            val badge = if (minHsk == maxHsk) "HSK $minHsk" else "HSK $minHsk–$maxHsk"
+            startVocabLesson(
+                lessonId = "tree_$nodeId",
+                title = title,
+                subtitle = words.take(3).joinToString(" · ") { "${it.hanzi} (${it.english.substringBefore(";")})" },
+                hskBadge = badge,
+                hskLevel = minHsk,
+                words = words
+            )
+        }
+    }
+
+    fun startShortcutPlacementQuiz(targetHskLevel: Int) {
+        viewModelScope.launch {
+            val pool = vocabRepo.getShortcutWordsForLevel(targetHskLevel, limit = 20)
+            if (pool.size < 4) {
+                _snackbarMessage.value = "Not enough words cached yet for HSK $targetHskLevel shortcut."
+                return@launch
+            }
+            val targets = pool.take(5)
+            val questions = targets.map { word ->
+                val wrong = pool.filter { it.hanzi != word.hanzi }.shuffled().take(3)
+                    .map { it.english.substringBefore(";").trim() }
+                val correctEn = word.english.substringBefore(";").trim()
+                val options = (wrong + correctEn).distinct().shuffled()
+                val correctIdx = options.indexOf(correctEn).coerceAtLeast(0)
+                ShortcutQuizQuestion(word = word, options = options, correctIndex = correctIdx)
+            }
+            _activeShortcutQuiz.value = ActiveShortcutQuiz(
+                targetHskLevel = targetHskLevel,
+                title = "HSK $targetHskLevel Shortcut Challenge",
+                questions = questions
+            )
+        }
+    }
+
+    fun completeShortcutQuiz(targetHskLevel: Int, passed: Boolean) {
+        _activeShortcutQuiz.value = null
+        if (passed) {
+            updateTargetHskLevel(targetHskLevel)
+            val levelKey = if (targetHskLevel >= 7) "7+" else targetHskLevel.toString()
+            setLearnHskLevel(levelKey)
+            val updated = _completedVocabLessonIds.value + "shortcut_hsk_$targetHskLevel"
+            _completedVocabLessonIds.value = updated
+            progressPrefs?.edit()?.putStringSet(progressPrefKey, updated)?.apply()
+            awardXp(60L, null, "Shortcut unlocked! Jumped to HSK $targetHskLevel")
+        } else {
+            _snackbarMessage.value = "Score 4/5 or higher to unlock the shortcut. Keep practicing!"
+        }
+    }
+
+    fun dismissShortcutQuiz() {
+        _activeShortcutQuiz.value = null
     }
 
     fun addWordsBatchToSrs(words: List<VocabWord>) {
@@ -704,8 +1095,14 @@ class PandaViewModel(
     fun jumpToWriteHanzi(hanzi: String) {
         val trimmed = hanzi.trim()
         if (trimmed.isEmpty()) return
-        val match = allVocab.value.firstOrNull { it.hanzi == trimmed }
-            ?: VocabWord(
+        val localMatch = allVocab.value.firstOrNull { it.hanzi == trimmed }
+        if (localMatch != null) {
+            jumpToWriteWord(localMatch)
+            return
+        }
+        viewModelScope.launch {
+            val dbMatch = vocabRepo.getWordByHanzi(trimmed)
+            val resolved = dbMatch ?: VocabWord(
                 key = "custom_write_$trimmed",
                 hanzi = trimmed,
                 pinyin = "",
@@ -714,7 +1111,32 @@ class PandaViewModel(
                 topicId = 1,
                 writable = true
             )
-        jumpToWriteWord(match)
+            jumpToWriteWord(resolved)
+        }
+    }
+
+    fun recordWritingPracticeComplete(char: String, accuracyPercent: Int, isQuizMode: Boolean) {
+        val xpReward = if (isQuizMode) 25L else 15L
+        val modeLabel = if (isQuizMode) "Quiz" else "Guided"
+        recordDailyActivity(practiceDelta = 1, minutesDelta = 1)
+        awardXp(
+            amount = xpReward,
+            completedUnitId = null,
+            reason = "Mastered '$char' ($modeLabel · $accuracyPercent% accuracy)"
+        )
+        speakChinese(char)
+    }
+
+    fun recordPronunciationPracticeComplete(hanzi: String, pitchScore: Int) {
+        recordDailyActivity(practiceDelta = 1, minutesDelta = 1)
+        if (pitchScore >= 70) {
+            val xpReward = if (pitchScore >= 85) 25L else 15L
+            awardXp(
+                amount = xpReward,
+                completedUnitId = null,
+                reason = "Pitch match on '$hanzi' ($pitchScore%)"
+            )
+        }
     }
 
     fun launchTopicLessonInAiTeacher(topicName: String, hskLevel: Int) {
@@ -780,6 +1202,77 @@ class PandaViewModel(
 
     fun setDailyWordsGoal(wordsGoal: Int) {
         displayPrefs.setDailyWordsGoal(wordsGoal)
+    }
+
+    fun setDailyWordGoalUnit(unit: DailyWordGoalUnit) {
+        displayPrefs.setDailyWordGoalUnit(unit)
+    }
+
+    fun setDailyWordGoalHskLevel(levelKey: String) {
+        displayPrefs.setDailyWordGoalHskLevel(levelKey)
+    }
+
+    fun setDailyWordGoalConfig(wordsGoal: Int, unit: DailyWordGoalUnit, levelKey: String) {
+        displayPrefs.setDailyWordGoalConfig(wordsGoal, unit, levelKey)
+        val scope = DailyWordGoalCalculator.formatHskScopeLabel(levelKey)
+        _snackbarMessage.value = "Daily goal updated: $wordsGoal ${unit.shortUnit}/day ($scope)"
+    }
+
+    fun markWordAcquiredToday(word: VocabWord) {
+        val newlyAdded = markWordsAsLearned(listOf(word.hanzi))
+        if (newlyAdded.isNotEmpty()) {
+            _snackbarMessage.value = "Acquired '${word.hanzi}' toward today's daily goal!"
+        } else {
+            _snackbarMessage.value = "'${word.hanzi}' is already in your learned vault."
+        }
+    }
+
+    fun openAcquiredWordBreakdown(hanzi: String) {
+        viewModelScope.launch {
+            val matched = vocabRepo.getWordByHanzi(hanzi)
+                ?: allVocab.value.firstOrNull { it.hanzi == hanzi }
+            if (matched != null) {
+                openWordBreakdown(matched)
+            } else {
+                speakChinese(hanzi)
+            }
+        }
+    }
+
+    fun startDailyWordGoalSession() {
+        viewModelScope.launch {
+            val snapshot = dailyTracker.value
+            val levelKey = snapshot.wordGoalHskLevel
+            val desiredCount = when {
+                snapshot.remainingWordsToday > 0 -> snapshot.remainingWordsToday.coerceIn(5, 12)
+                else -> snapshot.wordsGoal.coerceIn(5, 12)
+            }
+            val unlearned = vocabRepo.getNextUnlearnedWordsForLevel(
+                levelFilter = levelKey,
+                alreadyLearnedHanzi = _learnedWordHanzi.value,
+                limit = desiredCount
+            )
+            if (unlearned.isEmpty()) {
+                _snackbarMessage.value = "Syncing HSK 3.0 vocabulary — try again in a moment."
+                return@launch
+            }
+            val scopeLabel = DailyWordGoalCalculator.formatHskScopeLabel(levelKey)
+            val primaryLevel = unlearned.first().hskLevel
+            val lessonId = "daily_goal_${snapshot.todayDateKey}_${System.currentTimeMillis()}"
+            val subtitle = unlearned.take(3).joinToString(" · ") {
+                "${it.hanzi} (${it.english.substringBefore(";")})"
+            }
+            _activeAnkiSession.value = null
+            _selectedNavIndex.value = 0
+            startVocabLesson(
+                lessonId = lessonId,
+                title = "Daily Goal Pack · $scopeLabel",
+                subtitle = subtitle,
+                hskBadge = scopeLabel,
+                hskLevel = primaryLevel,
+                words = unlearned
+            )
+        }
     }
 
     fun setFocusTimerMinutes(minutes: Int) {
@@ -858,11 +1351,19 @@ class PandaViewModel(
     // --- GAMIFICATION & PROGRESS ---
 
     fun awardXp(amount: Long, completedUnitId: String? = null, reason: String? = null) {
+        if (completedUnitId != null) {
+            val unitKeyHanzi = HskCurriculumData.learningUnits
+                .firstOrNull { it.id == completedUnitId }
+                ?.keyHanzi
+                .orEmpty()
+            if (unitKeyHanzi.isNotEmpty()) {
+                markWordsAsLearned(unitKeyHanzi)
+            }
+        }
         if (amount > 0L || completedUnitId != null) {
             recordDailyActivity(
                 xpDelta = amount.toInt().coerceAtLeast(0),
                 lessonsDelta = if (completedUnitId != null) 1 else 0,
-                wordsDelta = if (completedUnitId != null) 6 else 0,
                 minutesDelta = if (completedUnitId != null) 3 else 0
             )
         }
@@ -950,9 +1451,11 @@ class PandaViewModel(
             }
             val saveRes = firestoreRepo.updateSrsReview(currentUserId, card.id, sm2, mnemonic)
             if (saveRes.isSuccess) {
+                if (quality >= 3) {
+                    markWordsAsLearned(listOf(card.hanzi))
+                }
                 recordDailyActivity(
                     xpDelta = if (quality >= 3) 15 else 0,
-                    wordsDelta = if (quality >= 3) 1 else 0,
                     srsDelta = 1,
                     minutesDelta = 1
                 )
@@ -1088,21 +1591,109 @@ class PandaViewModel(
 
     // --- AI GRADED STORY GENERATOR ---
 
-    fun generateAndSaveAiStory(hskLevel: Int, topicName: String, onCreated: (GradedStory) -> Unit) {
+    fun generateAndSaveAiStory(
+        hskLevel: Int,
+        topicName: String,
+        useUnlockedVocabOnly: Boolean = false,
+        onCreated: (GradedStory) -> Unit
+    ) {
         viewModelScope.launch {
             _isGeneratingStory.value = true
-            val res = aiRepo.generateGradedStory(hskLevel, topicName)
+            val unlocked = if (useUnlockedVocabOnly) {
+                learnedWordEntries.value.map { it.word.hanzi }.distinct()
+            } else emptyList()
+            val res = aiRepo.generateGradedStory(hskLevel, topicName, unlocked)
             res.onSuccess { story ->
                 firestoreRepo.saveGeneratedStory(currentUserId, story)
                 firestoreRepo.awardXpAndUnit(currentUserId, 25L)
                 recordDailyActivity(xpDelta = 25, storiesDelta = 1, minutesDelta = 2)
-                _snackbarMessage.value = "New HSK $hskLevel story '${story.titleZh}' created!"
+                val suffix = if (unlocked.isNotEmpty()) " (built from your unlocked vocabulary)" else ""
+                _snackbarMessage.value = "New HSK $hskLevel story '${story.titleZh}' created!$suffix"
                 onCreated(story)
             }.onFailure { err ->
                 _snackbarMessage.value = err.localizedMessage ?: "Story generation failed."
             }
             _isGeneratingStory.value = false
         }
+    }
+
+    // --- CAMERA POINT & LEARN, GRAMMAR TRANSFORMER, SOCRATIC HINT & SHADOWING GRADER ---
+
+    fun analyzeCameraPhoto(bitmap: Bitmap) {
+        viewModelScope.launch {
+            _cameraScanState.value = UiState.Loading
+            val targetLvl = (profileState.value as? UiState.Success)?.data?.currentHskLevel?.toInt()?.coerceIn(1, 9) ?: 1
+            val res = aiRepo.analyzePhotoPointAndLearn(bitmap, targetLvl)
+            res.onSuccess { result ->
+                _cameraScanState.value = UiState.Success(result)
+                recordDailyActivity(practiceDelta = 1, minutesDelta = 1)
+                awardXp(15L, null, "Scanned '${result.hanzi}' with Camera Point & Learn")
+                speakChinese(result.hanzi)
+            }.onFailure { err ->
+                _cameraScanState.value = UiState.Error(err.localizedMessage ?: "Could not analyze photo right now.")
+            }
+        }
+    }
+
+    fun clearCameraScan() {
+        _cameraScanState.value = null
+    }
+
+    fun transformGrammarPattern(baseSentence: String, label: String, instruction: String) {
+        if (baseSentence.isBlank()) return
+        viewModelScope.launch {
+            _grammarTransformState.value = UiState.Loading
+            val res = aiRepo.transformGrammarPattern(baseSentence.trim(), label, instruction)
+            res.onSuccess { result ->
+                _grammarTransformState.value = UiState.Success(result)
+                recordDailyActivity(practiceDelta = 1, minutesDelta = 1)
+                awardXp(10L, null, "Transformed sentence ($label)")
+                speakChinese(result.transformedHanzi)
+            }.onFailure { err ->
+                _grammarTransformState.value = UiState.Error(err.localizedMessage ?: "Grammar transformation failed.")
+            }
+        }
+    }
+
+    fun clearGrammarTransform() {
+        _grammarTransformState.value = null
+    }
+
+    fun requestSocraticHint(promptEn: String, userOrderHanzi: String, expectedHanzi: String) {
+        viewModelScope.launch {
+            _socraticHintState.value = UiState.Loading
+            val res = aiRepo.generateSocraticMistakeHint(promptEn, userOrderHanzi, expectedHanzi)
+            res.onSuccess { hint ->
+                _socraticHintState.value = UiState.Success(hint)
+            }.onFailure { err ->
+                _socraticHintState.value = UiState.Error(err.localizedMessage ?: "Could not load hint.")
+            }
+        }
+    }
+
+    fun clearSocraticHint() {
+        _socraticHintState.value = null
+    }
+
+    fun gradeShadowingDialogue(targetScript: String, targetPinyin: String, recognizedSpeech: String, hskLevel: Int) {
+        if (recognizedSpeech.isBlank()) return
+        viewModelScope.launch {
+            _shadowingGradeState.value = UiState.Loading
+            val res = aiRepo.gradeShadowingAttempt(targetScript, targetPinyin, recognizedSpeech, hskLevel)
+            res.onSuccess { grade ->
+                _shadowingGradeState.value = UiState.Success(grade)
+                recordDailyActivity(practiceDelta = 1, minutesDelta = 1)
+                if (grade.fluencyScore >= 70) {
+                    awardXp(20L, null, "Shadowing score ${grade.fluencyScore}%")
+                }
+            }.onFailure { err ->
+                _shadowingGradeState.value = UiState.Error(err.localizedMessage ?: "Shadowing analysis failed.")
+            }
+        }
+    }
+
+    fun clearShadowingGrade() {
+        _shadowingGradeState.value = null
     }
 
     // --- AI BONUS EXERCISE ---
@@ -1288,6 +1879,379 @@ class PandaViewModel(
                 isWelcome = true
             )
         )
+    }
+
+    // --- HSK 3.0 MOCK EXAM SIMULATOR ACTIONS ---
+
+    fun startHskMockExam(level: HskMockLevel, mode: HskMockExamMode) {
+        viewModelScope.launch {
+            _mockExamReport.value = null
+            _isGradingMockExam.value = false
+            val targetLimit = (mode.totalQuestions * 2).coerceAtLeast(40)
+            val levelWords = runCatching {
+                vocabRepo.getShortcutWordsForLevel(level.targetNumericLevel, limit = targetLimit)
+            }.getOrDefault(emptyList())
+            val distractors = runCatching {
+                vocabRepo.getDistractorWords(level.targetNumericLevel, emptyList(), limit = 40)
+            }.getOrDefault(emptyList())
+
+            _mockExamSession.value = HskMockExamGenerator.generateExam(
+                level = level,
+                mode = mode,
+                levelWords = levelWords,
+                distractorPool = distractors
+            )
+        }
+    }
+
+    fun submitHskMockExam(
+        answers: Map<String, MockQuestionAnswer>,
+        elapsedSeconds: Int
+    ) {
+        val session = _mockExamSession.value ?: return
+        if (_isGradingMockExam.value) return
+
+        viewModelScope.launch {
+            _isGradingMockExam.value = true
+            try {
+                var listeningEarned = 0.0
+                var listeningMax = 0
+                var readingEarned = 0.0
+                var readingMax = 0
+                var writingEarned = 0.0
+                var writingMax = 0
+
+                val mistakes = mutableListOf<MockExamMistakeItem>()
+                val missedWords = linkedMapOf<String, VocabWord>()
+
+                session.questions.forEachIndexed { idx, q ->
+                    val ans = answers[q.id] ?: MockQuestionAnswer()
+                    val qNum = idx + 1
+
+                    when (q.kind) {
+                        MockQuestionKind.LISTENING_AUDIO_MCQ -> {
+                            listeningMax++
+                            val correct = ans.selectedOptionIndex == q.correctOptionIndex
+                            if (correct) {
+                                listeningEarned += 1.0
+                            } else {
+                                val userText = ans.selectedOptionIndex?.let { q.options.getOrNull(it) } ?: "No answer selected"
+                                val correctText = q.options.getOrNull(q.correctOptionIndex).orEmpty()
+                                q.targetWords.forEach { missedWords[it.hanzi] = it }
+                                mistakes.add(
+                                    MockExamMistakeItem(
+                                        questionNumber = qNum,
+                                        section = MockExamSection.LISTENING,
+                                        promptSummary = q.promptText,
+                                        userAnswerDisplay = userText,
+                                        correctHanzi = q.hanziPrompt,
+                                        correctPinyin = q.pinyinPrompt,
+                                        correctEnglish = correctText,
+                                        feedbackNote = q.explanation,
+                                        missedWords = q.targetWords
+                                    )
+                                )
+                            }
+                        }
+
+                        MockQuestionKind.READING_HANZI_MEANING,
+                        MockQuestionKind.READING_COMPREHENSION,
+                        MockQuestionKind.READING_CLOZE -> {
+                            readingMax++
+                            val correct = ans.selectedOptionIndex == q.correctOptionIndex
+                            if (correct) {
+                                readingEarned += 1.0
+                            } else {
+                                val userText = ans.selectedOptionIndex?.let { q.options.getOrNull(it) } ?: "No answer selected"
+                                val correctOpt = q.options.getOrNull(q.correctOptionIndex).orEmpty()
+                                val primaryWord = q.targetWords.firstOrNull()
+                                q.targetWords.forEach { missedWords[it.hanzi] = it }
+                                mistakes.add(
+                                    MockExamMistakeItem(
+                                        questionNumber = qNum,
+                                        section = MockExamSection.READING,
+                                        promptSummary = q.hanziPrompt,
+                                        userAnswerDisplay = userText,
+                                        correctHanzi = primaryWord?.hanzi ?: correctOpt,
+                                        correctPinyin = primaryWord?.pinyin ?: q.pinyinPrompt,
+                                        correctEnglish = if (q.kind == MockQuestionKind.READING_CLOZE) {
+                                            "Missing word: $correctOpt (${primaryWord?.english.orEmpty()})"
+                                        } else correctOpt,
+                                        feedbackNote = q.explanation,
+                                        missedWords = q.targetWords
+                                    )
+                                )
+                            }
+                        }
+
+                        MockQuestionKind.WRITING_TILE_ORDER -> {
+                            writingMax++
+                            val assembled = ans.assembledTileIndices
+                                .mapNotNull { q.scrambledTiles.getOrNull(it)?.first }
+                                .joinToString("")
+                            val correct = assembled == q.expectedSentenceHanzi
+                            if (correct) {
+                                writingEarned += 1.0
+                            } else {
+                                q.targetWords.forEach { missedWords[it.hanzi] = it }
+                                mistakes.add(
+                                    MockExamMistakeItem(
+                                        questionNumber = qNum,
+                                        section = MockExamSection.WRITING,
+                                        promptSummary = q.hanziPrompt,
+                                        userAnswerDisplay = assembled.ifBlank { "No tiles placed" },
+                                        correctHanzi = q.expectedSentenceHanzi,
+                                        correctPinyin = q.expectedSentencePinyin,
+                                        correctEnglish = q.hanziPrompt,
+                                        feedbackNote = q.explanation,
+                                        missedWords = q.targetWords
+                                    )
+                                )
+                            }
+                        }
+
+                        MockQuestionKind.WRITING_FREE_SENTENCE -> {
+                            writingMax++
+                            val userText = ans.typedSentence.trim()
+                            if (userText.isBlank()) {
+                                q.targetWords.forEach { missedWords[it.hanzi] = it }
+                                mistakes.add(
+                                    MockExamMistakeItem(
+                                        questionNumber = qNum,
+                                        section = MockExamSection.WRITING,
+                                        promptSummary = "Target words: ${q.targetWords.joinToString(" + ") { it.hanzi }}",
+                                        userAnswerDisplay = "No sentence written",
+                                        correctHanzi = q.targetWords.joinToString(" · ") { it.hanzi },
+                                        correctPinyin = q.targetWords.joinToString(" · ") { it.pinyin },
+                                        correctEnglish = q.targetWords.joinToString(" / ") { it.english },
+                                        feedbackNote = q.explanation,
+                                        missedWords = q.targetWords
+                                    )
+                                )
+                            } else {
+                                // Try Gemini AI grader via existing PandaAiRepository; fall back cleanly offline
+                                val compositeTarget = VocabWord(
+                                    key = q.id,
+                                    hanzi = q.targetWords.joinToString(" & ") { it.hanzi },
+                                    pinyin = q.targetWords.joinToString(" / ") { it.pinyin },
+                                    english = q.targetWords.joinToString("; ") { it.english },
+                                    hskLevel = session.level.targetNumericLevel,
+                                    topicId = q.targetWords.firstOrNull()?.topicId ?: 1
+                                )
+                                val aiRes = aiRepo.gradeFreeSentence(compositeTarget, userText)
+                                val (score100, correctedZh, correctedPy, note) = if (aiRes.isSuccess) {
+                                    val g = aiRes.getOrThrow()
+                                    val containsBothBonus = if (q.targetWords.all { userText.contains(it.hanzi) }) 0 else -15
+                                    val adj = (g.score + containsBothBonus).coerceIn(0, 100)
+                                    listOf(
+                                        adj,
+                                        g.correctedHanzi.ifBlank { userText },
+                                        g.correctedPinyin,
+                                        "${g.verdict} (${adj}/100): ${g.grammarAnalysis}"
+                                    )
+                                } else {
+                                    val (offlineScore, offlineNote) = HskMockExamGenerator.scoreFreeSentenceOffline(
+                                        userSentence = userText,
+                                        targetWords = q.targetWords
+                                    )
+                                    listOf(
+                                        offlineScore,
+                                        q.targetWords.joinToString(" · ") { it.hanzi },
+                                        q.targetWords.joinToString(" · ") { it.pinyin },
+                                        offlineNote
+                                    )
+                                }
+
+                                val numericScore = score100 as Int
+                                writingEarned += (numericScore / 100.0)
+
+                                if (numericScore < 75) {
+                                    q.targetWords.forEach { missedWords[it.hanzi] = it }
+                                    mistakes.add(
+                                        MockExamMistakeItem(
+                                            questionNumber = qNum,
+                                            section = MockExamSection.WRITING,
+                                            promptSummary = "Target words: ${q.targetWords.joinToString(" + ") { it.hanzi }}",
+                                            userAnswerDisplay = userText,
+                                            correctHanzi = correctedZh as String,
+                                            correctPinyin = correctedPy as String,
+                                            correctEnglish = q.targetWords.joinToString(" / ") { "${it.hanzi}: ${it.english}" },
+                                            feedbackNote = note as String,
+                                            missedWords = q.targetWords
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                val lScore = if (listeningMax > 0) ((listeningEarned / listeningMax) * 100.0).toInt().coerceIn(0, 100) else 0
+                val rScore = if (readingMax > 0) ((readingEarned / readingMax) * 100.0).toInt().coerceIn(0, 100) else 0
+                val wScore = if (writingMax > 0) ((writingEarned / writingMax) * 100.0).toInt().coerceIn(0, 100) else 0
+                val totalScore = (lScore + rScore + wScore).coerceIn(0, 300)
+                val passed = totalScore >= 180
+
+                val minutesLogged = ((elapsedSeconds + 59) / 60).coerceAtLeast(1)
+                val xpEarned = if (passed) {
+                    if (session.mode == HskMockExamMode.FULL) 120 else 65
+                } else {
+                    if (session.mode == HskMockExamMode.FULL) 50 else 30
+                }
+                val now = System.currentTimeMillis()
+
+                // Persist to SharedPreferences history (zero Room DB modifications!)
+                val record = PastMockExamRecord(
+                    id = session.examId,
+                    levelLabel = session.level.label,
+                    modeLabel = session.mode.label,
+                    dateLabel = HskMockExamGenerator.formatExamDate(now),
+                    totalScore = totalScore,
+                    listeningScore = lScore,
+                    readingScore = rScore,
+                    writingScore = wScore,
+                    passed = passed,
+                    timestampEpochMs = now
+                )
+                val updatedHistory = (listOf(record) + _pastMockExams.value).take(25)
+                _pastMockExams.value = updatedHistory
+                progressPrefs?.edit()
+                    ?.putString(mockExamHistoryPrefKey, HskMockExamGenerator.serializeHistory(updatedHistory))
+                    ?.apply()
+
+                // Log XP & study minutes to Daily Learning Tracker + profile XP
+                recordDailyActivity(
+                    xpDelta = xpEarned,
+                    practiceDelta = 1,
+                    minutesDelta = minutesLogged
+                )
+                firestoreRepo.awardXpAndUnit(currentUserId, xpEarned.toLong())
+
+                _mockExamReport.value = MockExamReport(
+                    examId = session.examId,
+                    level = session.level,
+                    mode = session.mode,
+                    timestampEpochMs = now,
+                    listeningScore = lScore,
+                    readingScore = rScore,
+                    writingScore = wScore,
+                    totalScore = totalScore,
+                    passed = passed,
+                    elapsedSeconds = elapsedSeconds,
+                    mistakes = mistakes,
+                    missedVocabWords = missedWords.values.toList(),
+                    xpEarned = xpEarned,
+                    minutesLogged = minutesLogged
+                )
+                _mockExamSession.value = null
+            } finally {
+                _isGradingMockExam.value = false
+            }
+        }
+    }
+
+    fun addMockExamMissedWordsToAnki(words: List<VocabWord>) {
+        if (words.isEmpty()) return
+        viewModelScope.launch {
+            var added = 0
+            words.distinctBy { it.hanzi }.forEach { word ->
+                val res = firestoreRepo.upsertSrsCard(currentUserId, word)
+                if (res.isSuccess) added++
+            }
+            if (added > 0) {
+                recordDailyActivity(srsDelta = added)
+                _snackbarMessage.value = "Added $added missed mock exam word(s) to Anki SM-2 Review!"
+            } else {
+                _snackbarMessage.value = "Could not add missed words right now."
+            }
+        }
+    }
+
+    fun exitHskMockExam() {
+        _mockExamSession.value = null
+        _mockExamReport.value = null
+        _isGradingMockExam.value = false
+    }
+
+    // --- MEASURE WORDS & NEAR-SYNONYMS BATTLE LAB ---
+    private val _synonymExtraExamples = MutableStateFlow<Map<String, UiState<String>>>(emptyMap())
+    val synonymExtraExamples: StateFlow<Map<String, UiState<String>>> = _synonymExtraExamples.asStateFlow()
+
+    fun requestSynonymExtraExamples(battle: SynonymBattleItem) {
+        val existing = _synonymExtraExamples.value[battle.id]
+        if (existing is UiState.Loading) return
+        _synonymExtraExamples.value = _synonymExtraExamples.value + (battle.id to UiState.Loading)
+        viewModelScope.launch {
+            try {
+                val prompt = buildString {
+                    append("Compare the Mandarin near-synonyms ${battle.title} (HSK ${battle.hskLevel}). ")
+                    append("Provide EXACTLY 2 short, practical extra contrast example sentences. ")
+                    append("Format each line cleanly as: 1) Hanzi (Pinyin) — English [Short grammar note]. ")
+                    append("No intro or outro text.")
+                }
+                val builder = StringBuilder()
+                withTimeout(25_000L) {
+                    aiRepo.streamTeacherReply(
+                        history = emptyList(),
+                        userPrompt = prompt,
+                        hskLevel = battle.hskLevel,
+                        mode = TutorMode.GRAMMAR,
+                        useGoogleSearch = false
+                    ).collect { chunk ->
+                        builder.append(chunk.textDelta)
+                    }
+                }
+                val generated = builder.toString().trim()
+                val finalContent = if (generated.isNotBlank()) {
+                    generated
+                } else {
+                    "Offline Panda Laoshi Backup:\n${battle.offlineExtraExamples}"
+                }
+                _synonymExtraExamples.value = _synonymExtraExamples.value +
+                    (battle.id to UiState.Success(finalContent))
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (e: Exception) {
+                Log.w(VM_TAG, "Using offline fallback synonym examples for ${battle.id}", e)
+                _synonymExtraExamples.value = _synonymExtraExamples.value +
+                    (battle.id to UiState.Success("Offline Panda Laoshi Backup:\n${battle.offlineExtraExamples}"))
+            }
+        }
+    }
+
+    fun completeMeasureOrSynonymRound(
+        modeLabel: String,
+        correctCount: Int,
+        totalCount: Int,
+        minutesStudied: Int = 2
+    ) {
+        val xpEarned = (correctCount * 4 + 10).coerceIn(10, 60)
+        recordDailyActivity(
+            xpDelta = xpEarned,
+            practiceDelta = 1,
+            minutesDelta = minutesStudied.coerceAtLeast(1)
+        )
+        viewModelScope.launch {
+            firestoreRepo.awardXpAndUnit(currentUserId, xpEarned.toLong())
+            _snackbarMessage.value = "+$xpEarned XP · $modeLabel ($correctCount/$totalCount)"
+        }
+    }
+
+    fun saveMeasureOrSynonymItemsToAnki(words: List<VocabWord>, sourceLabel: String = "Measure & Synonyms") {
+        if (words.isEmpty()) return
+        viewModelScope.launch {
+            var added = 0
+            words.distinctBy { it.hanzi }.forEach { word ->
+                val res = firestoreRepo.upsertSrsCard(currentUserId, word)
+                if (res.isSuccess) added++
+            }
+            if (added > 0) {
+                recordDailyActivity(srsDelta = added)
+                _snackbarMessage.value = "Saved $added $sourceLabel item(s) to Anki SM-2 Review!"
+            } else {
+                _snackbarMessage.value = "Could not save items to Anki right now."
+            }
+        }
     }
 
     override fun onCleared() {

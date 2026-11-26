@@ -261,7 +261,7 @@ class PandaFirestoreRepository(
         )
     }
 
-    private fun buildSafeSrsDocId(wordKey: String): String {
+    fun buildSafeSrsDocId(wordKey: String): String {
         val asciiPrefix = wordKey.replace(Regex("[^a-zA-Z0-9_\\-]"), "_").trim('_').take(24)
         val needsHash = wordKey.any { it.code > 127 } || wordKey.length > 24
         return if (needsHash) {

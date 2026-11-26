@@ -207,6 +207,71 @@ interface HskVocabularyDao {
     @Query("SELECT hanzi FROM hsk_vocabulary WHERE example_hanzi != ''")
     suspend fun getCuratedHanziWithExamples(): List<String>
 
+    @Query(
+        """
+        SELECT * FROM hsk_vocabulary
+        WHERE topic_id IN (:topicIds)
+        ORDER BY CASE WHEN example_hanzi != '' THEN 0 ELSE 1 END,
+                 hsk_level ASC,
+                 RANDOM()
+        LIMIT :limit
+        """
+    )
+    suspend fun getWordsForTopics(topicIds: List<Int>, limit: Int): List<HskVocabularyEntity>
+
+    @Query(
+        """
+        SELECT * FROM hsk_vocabulary
+        WHERE topic_id = :topicId
+          AND hsk_level BETWEEN :levelMin AND :levelMax
+        ORDER BY CASE WHEN example_hanzi != '' THEN 0 ELSE 1 END,
+                 hsk_level ASC,
+                 word_key ASC
+        LIMIT :limit
+        """
+    )
+    suspend fun getWordsForTopicAndLevelRange(
+        topicId: Int,
+        levelMin: Int,
+        levelMax: Int,
+        limit: Int
+    ): List<HskVocabularyEntity>
+
+    @Query(
+        """
+        SELECT * FROM hsk_vocabulary
+        WHERE hsk_level BETWEEN :levelMin AND :levelMax
+        ORDER BY RANDOM()
+        LIMIT :limit
+        """
+    )
+    suspend fun getRandomWordsForLevelRange(
+        levelMin: Int,
+        levelMax: Int,
+        limit: Int
+    ): List<HskVocabularyEntity>
+
+    @Query("SELECT * FROM hsk_vocabulary WHERE hanzi IN (:hanziList)")
+    suspend fun getVocabularyByHanziList(hanziList: List<String>): List<HskVocabularyEntity>
+
+    @Query(
+        """
+        SELECT * FROM hsk_vocabulary
+        WHERE hsk_level BETWEEN :levelMin AND :levelMax
+        ORDER BY CASE WHEN example_hanzi != '' THEN 0 ELSE 1 END,
+                 hsk_level ASC,
+                 topic_id ASC,
+                 word_key ASC
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    suspend fun getOrderedWordsForLevelRange(
+        levelMin: Int,
+        levelMax: Int,
+        limit: Int,
+        offset: Int
+    ): List<HskVocabularyEntity>
+
     @Query("SELECT COUNT(*) FROM hsk_vocabulary")
     suspend fun countVocabulary(): Int
 

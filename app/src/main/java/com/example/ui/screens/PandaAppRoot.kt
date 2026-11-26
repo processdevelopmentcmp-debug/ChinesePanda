@@ -20,8 +20,10 @@ import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Brush
+import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.Explore
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.FormatSize
 import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.LocalFireDepartment
@@ -81,6 +83,9 @@ import com.example.model.UserProfile
 import com.example.ui.components.AuthScreen
 import com.example.ui.components.PandaMascotAvatar
 import com.example.ui.components.StatBadgePill
+import com.example.ui.screens.practice.AlreadyLearnedVaultScreen
+import com.example.ui.screens.practice.AnkiReviewSessionView
+import com.example.ui.screens.practice.VaultSubScreen
 import com.example.ui.theme.CoralContainer
 import com.example.ui.theme.CoralVermilion
 import com.example.ui.theme.GoldAccent
@@ -107,7 +112,8 @@ private val NAV_DESTINATIONS = listOf(
     NavDestination(1, R.string.nav_topics, Icons.Rounded.MenuBook, "nav_topics"),
     NavDestination(2, R.string.nav_practice, Icons.Rounded.Brush, "nav_practice"),
     NavDestination(3, R.string.nav_review, Icons.Rounded.Psychology, "nav_review"),
-    NavDestination(4, R.string.nav_teacher, Icons.Rounded.AutoAwesome, "nav_teacher")
+    NavDestination(4, R.string.nav_teacher, Icons.Rounded.AutoAwesome, "nav_teacher"),
+    NavDestination(5, R.string.nav_write_stroke, Icons.Rounded.Draw, "nav_write_stroke")
 )
 
 @Composable
@@ -182,17 +188,25 @@ private fun AuthenticatedPandaShell(
     val inspectedAnatomy by viewModel.inspectedWordAnatomy.collectAsStateWithLifecycle()
     val inspectedStoryState by viewModel.inspectedWordStoryState.collectAsStateWithLifecycle()
     val dailyTracker by viewModel.dailyTracker.collectAsStateWithLifecycle()
+    val hskLevelSummaries by viewModel.hskLevelSummaries.collectAsStateWithLifecycle()
+    val totalCatalogWords by viewModel.totalVocabCount.collectAsStateWithLifecycle()
+    val learnedWordHanzi by viewModel.learnedWordHanzi.collectAsStateWithLifecycle()
+    val hskProfileShowcase by viewModel.hskProfileShowcase.collectAsStateWithLifecycle()
     val focusDurationMin by viewModel.focusTimerDurationMin.collectAsStateWithLifecycle()
     val focusRemainingSec by viewModel.focusTimerRemainingSec.collectAsStateWithLifecycle()
     val focusRunning by viewModel.focusTimerRunning.collectAsStateWithLifecycle()
+    val activeAnkiSession by viewModel.activeAnkiSession.collectAsStateWithLifecycle()
     val appFontScale by displayPrefs.fontScale.collectAsStateWithLifecycle()
     val themeMode by displayPrefs.themeMode.collectAsStateWithLifecycle()
     val audioSpeed by viewModel.audioSpeed.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
-    var showProfileDialog by remember { mutableStateOf(false) }
+    var showProfilePage by remember { mutableStateOf(false) }
     var showFontSheet by remember { mutableStateOf(false) }
     var showDailyTrackerSheet by remember { mutableStateOf(false) }
+    var showWordGoalSheet by remember { mutableStateOf(false) }
+    // null = closed; Pair(initialSubScreen, allTopicsMode)
+    var learnedVaultLaunch by remember { mutableStateOf<Pair<VaultSubScreen, Boolean>?>(null) }
 
     LaunchedEffect(snackbarMsg) {
         val msg = snackbarMsg
@@ -228,10 +242,19 @@ private fun AuthenticatedPandaShell(
                     profile = profile,
                     dueCount = dueCount,
                     dailyStreakDisplay = maxOf(profile.streak.toInt(), dailyTracker.currentStreakDays),
-                    onDueClick = { viewModel.selectNavTab(3) },
+                    onDueClick = {
+                        showProfilePage = false
+                        learnedVaultLaunch = null
+                        viewModel.dismissAnkiSession()
+                        viewModel.selectNavTab(3)
+                    },
                     onDailyTrackerClick = { showDailyTrackerSheet = true },
                     onFontResizeClick = { showFontSheet = true },
-                    onProfileClick = { showProfileDialog = true }
+                    onProfileClick = {
+                        learnedVaultLaunch = null
+                        viewModel.dismissAnkiSession()
+                        showProfilePage = true
+                    }
                 )
             },
             bottomBar = {
@@ -239,8 +262,13 @@ private fun AuthenticatedPandaShell(
                     NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                         NAV_DESTINATIONS.forEach { dest ->
                             NavigationBarItem(
-                                selected = selectedTab == dest.index,
-                                onClick = { viewModel.selectNavTab(dest.index) },
+                                selected = selectedTab == dest.index && !showProfilePage && learnedVaultLaunch == null && activeAnkiSession == null,
+                                onClick = {
+                                    showProfilePage = false
+                                    learnedVaultLaunch = null
+                                    viewModel.dismissAnkiSession()
+                                    viewModel.selectNavTab(dest.index)
+                                },
                                 icon = {
                                     Icon(dest.icon, contentDescription = stringResource(dest.labelRes))
                                 },
@@ -266,8 +294,13 @@ private fun AuthenticatedPandaShell(
                     ) {
                         NAV_DESTINATIONS.forEach { dest ->
                             NavigationRailItem(
-                                selected = selectedTab == dest.index,
-                                onClick = { viewModel.selectNavTab(dest.index) },
+                                selected = selectedTab == dest.index && !showProfilePage && learnedVaultLaunch == null && activeAnkiSession == null,
+                                onClick = {
+                                    showProfilePage = false
+                                    learnedVaultLaunch = null
+                                    viewModel.dismissAnkiSession()
+                                    viewModel.selectNavTab(dest.index)
+                                },
                                 icon = {
                                     Icon(dest.icon, contentDescription = stringResource(dest.labelRes))
                                 },
@@ -279,16 +312,73 @@ private fun AuthenticatedPandaShell(
                 }
 
                 Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                    when (selectedTab) {
-                        0 -> LearnPathScreen(
-                            viewModel = viewModel,
-                            profile = profile,
-                            onOpenDailyTracker = { showDailyTrackerSheet = true }
-                        )
-                        1 -> TopicsScreen(viewModel = viewModel)
-                        2 -> PracticeHubScreen(viewModel = viewModel)
-                        3 -> ReviewAndStoriesScreen(viewModel = viewModel)
-                        4 -> AiTeacherScreen(viewModel = viewModel)
+                    when {
+                        activeAnkiSession != null -> {
+                            AnkiReviewSessionView(
+                                session = activeAnkiSession!!,
+                                onSpeak = { text, speed -> viewModel.speakChinese(text, speed) },
+                                onRateCard = { entry, quality -> viewModel.rateAnkiCard(entry, quality) },
+                                onOpenWordBreakdown = { word -> viewModel.openWordBreakdown(word) },
+                                onPracticeWrite = { word ->
+                                    viewModel.dismissAnkiSession()
+                                    learnedVaultLaunch = null
+                                    showProfilePage = false
+                                    viewModel.jumpToWriteWord(word)
+                                },
+                                onDismiss = { viewModel.dismissAnkiSession() }
+                            )
+                        }
+                        showProfilePage -> {
+                            ProfileAchievementsScreen(
+                                profile = profile,
+                                userEmail = userEmail,
+                                dailyTracker = dailyTracker,
+                                showcase = hskProfileShowcase,
+                                onUpdateTargetHskLevel = { lvl -> viewModel.updateTargetHskLevel(lvl) },
+                                onPracticeHskLevel = { levelKey -> viewModel.jumpToHskLevelInLearn(levelKey) },
+                                onOpenWordGoalSetter = { showWordGoalSheet = true },
+                                onOpenDailyTracker = { showDailyTrackerSheet = true },
+                                onOpenFontSettings = { showFontSheet = true },
+                                onSignOut = {
+                                    showProfilePage = false
+                                    signOutUser(credentialManager, scope)
+                                },
+                                onBack = { showProfilePage = false }
+                            )
+                        }
+                        learnedVaultLaunch != null -> {
+                            AlreadyLearnedVaultScreen(
+                                viewModel = viewModel,
+                                initialSubScreen = learnedVaultLaunch!!.first,
+                                initialTopicModeAllWords = learnedVaultLaunch!!.second,
+                                onBack = { learnedVaultLaunch = null }
+                            )
+                        }
+                        else -> {
+                            when (selectedTab) {
+                                0 -> LearnPathScreen(
+                                    viewModel = viewModel,
+                                    profile = profile,
+                                    onOpenDailyTracker = { showDailyTrackerSheet = true },
+                                    onOpenWordGoalSetter = { showWordGoalSheet = true },
+                                    onOpenLearnedVault = { learnedVaultLaunch = VaultSubScreen.HUB to false },
+                                    onOpenProfilePage = { showProfilePage = true }
+                                )
+                                1 -> TopicsScreen(viewModel = viewModel)
+                                2 -> PracticeHubScreen(
+                                    viewModel = viewModel,
+                                    onOpenLearnedVault = { learnedVaultLaunch = VaultSubScreen.HUB to false },
+                                    onOpenTopicAnkiSelector = { learnedVaultLaunch = VaultSubScreen.WORDS_SELECTOR to true }
+                                )
+                                3 -> ReviewAndStoriesScreen(
+                                    viewModel = viewModel,
+                                    onOpenLearnedVault = { learnedVaultLaunch = VaultSubScreen.HUB to false },
+                                    onOpenTopicAnkiSelector = { learnedVaultLaunch = VaultSubScreen.WORDS_SELECTOR to true }
+                                )
+                                4 -> AiTeacherScreen(viewModel = viewModel)
+                                5 -> StrokePracticeScreen(viewModel = viewModel)
+                            }
+                        }
                     }
                 }
             }
@@ -338,72 +428,36 @@ private fun AuthenticatedPandaShell(
             onResetFocusTimer = { viewModel.resetFocusTimer() },
             onSetXpGoal = { viewModel.setDailyXpGoal(it) },
             onSetWordsGoal = { viewModel.setDailyWordsGoal(it) },
+            onOpenWordGoalSetter = {
+                showDailyTrackerSheet = false
+                showWordGoalSheet = true
+            },
+            onStartDailyGoalLesson = {
+                learnedVaultLaunch = null
+                viewModel.startDailyWordGoalSession()
+            },
+            onTapAcquiredWord = { hanzi -> viewModel.openAcquiredWordBreakdown(hanzi) },
             onNavigateToTab = { tabIndex -> viewModel.selectNavTab(tabIndex) },
             onDismiss = { showDailyTrackerSheet = false }
         )
     }
 
-    if (showProfileDialog) {
-        AlertDialog(
-            onDismissRequest = { showProfileDialog = false },
-            icon = { PandaMascotAvatar(size = 56.dp, animated = false) },
-            title = { Text(profile.displayName) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (userEmail.isNotBlank()) {
-                        Text(userEmail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Text("Total XP: ${profile.xp} XP", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Daily Streak: ${profile.streak} day(s)", style = MaterialTheme.typography.bodyMedium)
-                    Text("Completed Units: ${profile.completedUnitIds.size}", style = MaterialTheme.typography.bodyMedium)
-                    Text("Target HSK 3.0 Level: HSK ${profile.currentHskLevel}", style = MaterialTheme.typography.bodyMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf(1, 3, 5, 7).forEach { lvl ->
-                            TextButton(onClick = { viewModel.updateTargetHskLevel(lvl) }) {
-                                Text("Set HSK $lvl")
-                            }
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(
-                            onClick = {
-                                showProfileDialog = false
-                                showFontSheet = true
-                            }
-                        ) {
-                            Icon(Icons.Rounded.FormatSize, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Font Size")
-                        }
-                        TextButton(
-                            onClick = {
-                                showProfileDialog = false
-                                showDailyTrackerSheet = true
-                            }
-                        ) {
-                            Icon(Icons.Rounded.Insights, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Daily Tracker")
-                        }
-                    }
-                }
+    if (showWordGoalSheet) {
+        DailyWordAcquisitionGoalSheet(
+            snapshot = dailyTracker,
+            levelSummaries = hskLevelSummaries,
+            totalCatalogWords = totalCatalogWords,
+            totalLearnedWords = learnedWordHanzi.size,
+            onSaveGoal = { targetCount, unit, hskLevelKey ->
+                viewModel.setDailyWordGoalConfig(targetCount, unit, hskLevelKey)
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showProfileDialog = false
-                        signOutUser(credentialManager, scope)
-                    },
-                    modifier = Modifier.testTag("sign_out_button")
-                ) {
-                    Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text(stringResource(R.string.sign_out), color = CoralVermilion)
-                }
+            onSaveAndStartPack = { targetCount, unit, hskLevelKey ->
+                viewModel.setDailyWordGoalConfig(targetCount, unit, hskLevelKey)
+                showProfilePage = false
+                learnedVaultLaunch = null
+                viewModel.startDailyWordGoalSession()
             },
-            dismissButton = {
-                TextButton(onClick = { showProfileDialog = false }) { Text("Close") }
-            }
+            onDismiss = { showWordGoalSheet = false }
         )
     }
 }

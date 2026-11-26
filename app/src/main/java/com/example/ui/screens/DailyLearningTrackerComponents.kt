@@ -31,7 +31,9 @@ import androidx.compose.material.icons.rounded.AutoStories
 import androidx.compose.material.icons.rounded.BookmarkAdd
 import androidx.compose.material.icons.rounded.Brush
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Pause
@@ -39,6 +41,8 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material.icons.rounded.WbSunny
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -77,6 +81,8 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.local.DailyMission
 import com.example.data.local.DailyTrackerSnapshot
+import com.example.data.local.DailyWordGoalCalculator
+import com.example.data.local.DailyWordGoalUnit
 import com.example.model.VocabWord
 import com.example.ui.theme.CoralVermilion
 import com.example.ui.theme.GoldAccent
@@ -84,6 +90,7 @@ import com.example.ui.theme.GoldBright
 import com.example.ui.theme.GoldContainer
 import com.example.ui.theme.HanziSerifFontFamily
 import com.example.ui.theme.IndigoAccent
+import com.example.ui.theme.JadeDeep
 import com.example.ui.theme.JadeLightContainer
 import com.example.ui.theme.JadePrimary
 import com.example.ui.theme.JadeVibrant
@@ -94,10 +101,16 @@ fun DailyTrackerCompactCard(
     snapshot: DailyTrackerSnapshot,
     focusTimerRunning: Boolean,
     focusTimerRemainingSec: Int,
-    onOpenFullTracker: () -> Unit
+    onOpenFullTracker: () -> Unit,
+    onOpenWordGoalSetter: () -> Unit = onOpenFullTracker,
+    onStartDailyGoalLesson: () -> Unit = onOpenFullTracker
 ) {
     val today = snapshot.todayLog
     val completedMissions = snapshot.missions.count { it.isComplete }
+    val hskScopeLabel = DailyWordGoalCalculator.formatHskScopeLabel(snapshot.wordGoalHskLevel)
+    val acquired = snapshot.todayWordGoalAcquired
+    val remaining = snapshot.remainingWordsToday
+    val unitShort = snapshot.wordGoalUnit.shortUnit
 
     Surface(
         modifier = Modifier
@@ -109,8 +122,8 @@ fun DailyTrackerCompactCard(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
         border = BorderStroke(
-            width = if (snapshot.isDailyGoalComplete) 1.8.dp else 1.dp,
-            color = if (snapshot.isDailyGoalComplete) JadePrimary else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+            width = if (snapshot.isWordGoalComplete) 1.8.dp else 1.dp,
+            color = if (snapshot.isWordGoalComplete) JadePrimary else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
         )
     ) {
         Column(
@@ -152,10 +165,10 @@ fun DailyTrackerCompactCard(
                         )
                     }
                     Text(
-                        text = if (snapshot.isDailyGoalComplete) {
-                            "Daily goal hit! ${today.xpEarned}/${snapshot.xpGoal} XP · ${today.wordsLearned}/${snapshot.wordsGoal} words"
+                        text = if (snapshot.isWordGoalComplete) {
+                            "Word goal hit! $acquired/${snapshot.wordsGoal} $unitShort · ${today.xpEarned}/${snapshot.xpGoal} XP"
                         } else {
-                            "${today.xpEarned}/${snapshot.xpGoal} XP · ${today.wordsLearned}/${snapshot.wordsGoal} words · $completedMissions/${snapshot.missions.size} missions"
+                            "${today.xpEarned}/${snapshot.xpGoal} XP · $completedMissions/${snapshot.missions.size} missions · ${snapshot.currentStreakDays}d streak"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -197,6 +210,108 @@ fun DailyTrackerCompactCard(
                 }
             }
 
+            // Dedicated Daily Word Acquisition Goal Strip
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f),
+                border = BorderStroke(
+                    1.dp,
+                    if (snapshot.isWordGoalComplete) JadePrimary.copy(alpha = 0.5f) else GoldAccent.copy(alpha = 0.4f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Flag,
+                                contentDescription = null,
+                                tint = if (snapshot.isWordGoalComplete) JadePrimary else GoldAccent,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Daily $hskScopeLabel Goal: $acquired / ${snapshot.wordsGoal} $unitShort",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = if (snapshot.isWordGoalComplete) JadeLightContainer else GoldContainer
+                        ) {
+                            Text(
+                                text = if (snapshot.isWordGoalComplete) "Hit!" else "$remaining left",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (snapshot.isWordGoalComplete) JadeDeep else Color(0xFF4A3100),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    LinearProgressIndicator(
+                        progress = { snapshot.wordsProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(7.dp)
+                            .clip(RoundedCornerShape(50)),
+                        color = if (snapshot.isWordGoalComplete) JadePrimary else GoldAccent,
+                        trackColor = MaterialTheme.colorScheme.surface
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onOpenWordGoalSetter,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("compact_edit_word_goal_button")
+                        ) {
+                            Icon(
+                                Icons.Rounded.Edit,
+                                contentDescription = stringResource(R.string.cd_edit_word_goal),
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(Modifier.width(5.dp))
+                            Text("Set Goal", maxLines = 1)
+                        }
+                        Button(
+                            onClick = onStartDailyGoalLesson,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = JadePrimary),
+                            modifier = Modifier
+                                .weight(1.25f)
+                                .testTag("compact_start_daily_goal_button")
+                        ) {
+                            Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = if (remaining > 0) "Learn $remaining Left" else "Bonus Pack",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+
             // Compact 7-day strip
             if (snapshot.last7Days.isNotEmpty()) {
                 Row(
@@ -214,7 +329,8 @@ fun DailyTrackerCompactCard(
                                     .clip(CircleShape)
                                     .background(
                                         when {
-                                            day.goalReached -> JadePrimary
+                                            day.wordGoalReached -> JadePrimary
+                                            day.goalReached -> GoldAccent
                                             day.hasActivity -> JadePrimary.copy(alpha = 0.28f)
                                             day.isToday -> MaterialTheme.colorScheme.secondaryContainer
                                             else -> MaterialTheme.colorScheme.surfaceVariant
@@ -222,7 +338,7 @@ fun DailyTrackerCompactCard(
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                if (day.goalReached) {
+                                if (day.wordGoalReached || day.goalReached) {
                                     Icon(
                                         Icons.Rounded.CheckCircle,
                                         contentDescription = "Goal reached",
@@ -259,7 +375,8 @@ fun WordOfTheDaySpotlightCard(
     onSpeak: (String, Float) -> Unit,
     onOpenBreakdown: (VocabWord) -> Unit,
     onAddSrs: (VocabWord) -> Unit,
-    onWriteWord: (VocabWord) -> Unit
+    onWriteWord: (VocabWord) -> Unit,
+    onMarkLearned: (VocabWord) -> Unit = {}
 ) {
     Surface(
         modifier = Modifier
@@ -402,6 +519,15 @@ fun WordOfTheDaySpotlightCard(
                     Spacer(Modifier.width(4.dp))
                     Text("Write")
                 }
+                OutlinedButton(
+                    onClick = { onMarkLearned(word) },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.testTag("wotd_acquire_button")
+                ) {
+                    Icon(Icons.Rounded.CheckCircle, contentDescription = null, tint = JadePrimary, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Learned +1")
+                }
             }
         }
     }
@@ -419,11 +545,14 @@ fun DailyLearningTrackerSheet(
     onResetFocusTimer: () -> Unit,
     onSetXpGoal: (Int) -> Unit,
     onSetWordsGoal: (Int) -> Unit,
+    onOpenWordGoalSetter: () -> Unit = {},
+    onStartDailyGoalLesson: () -> Unit = {},
+    onTapAcquiredWord: (String) -> Unit = {},
     onNavigateToTab: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var chartShowWords by remember { mutableStateOf(false) }
+    var chartShowWords by remember { mutableStateOf(true) }
     var selectedDayIndex by remember(snapshot.last7Days.size) {
         mutableIntStateOf((snapshot.last7Days.size - 1).coerceAtLeast(0))
     }
@@ -540,7 +669,7 @@ fun DailyLearningTrackerSheet(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "Inner ring (Gold): ${snapshot.todayLog.wordsLearned} / ${snapshot.wordsGoal} words",
+                                text = "Inner ring (Gold): ${snapshot.todayWordGoalAcquired} / ${snapshot.wordsGoal} ${snapshot.wordGoalUnit.shortUnit}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = GoldAccent,
                                 fontWeight = FontWeight.SemiBold
@@ -555,7 +684,11 @@ fun DailyLearningTrackerSheet(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         TrackerMetricTile("${t.xpEarned}", "XP Today", Modifier.weight(1f))
-                        TrackerMetricTile("${t.wordsLearned}", "Words", Modifier.weight(1f))
+                        TrackerMetricTile(
+                            "${snapshot.todayWordGoalAcquired}",
+                            if (snapshot.wordGoalUnit == DailyWordGoalUnit.CHARACTERS) "New Hanzi" else "New Words",
+                            Modifier.weight(1f)
+                        )
                         TrackerMetricTile("${t.lessonsCompleted}", "Lessons", Modifier.weight(1f))
                     }
                     Row(
@@ -568,6 +701,20 @@ fun DailyLearningTrackerSheet(
                     }
                 }
             }
+
+            // Dedicated Daily Word Acquisition Goal Module
+            DailyWordAcquisitionModuleCard(
+                snapshot = snapshot,
+                onEditGoal = onOpenWordGoalSetter,
+                onStartDailyPack = {
+                    onDismiss()
+                    onStartDailyGoalLesson()
+                },
+                onTapWord = { hanzi ->
+                    onDismiss()
+                    onTapAcquiredWord(hanzi)
+                }
+            )
 
             // Daily Mission Checklist
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -582,7 +729,11 @@ fun DailyLearningTrackerSheet(
                         mission = mission,
                         onGo = {
                             onDismiss()
-                            onNavigateToTab(mission.targetNavTab)
+                            if (mission.id == "mission_word_goal") {
+                                onStartDailyGoalLesson()
+                            } else {
+                                onNavigateToTab(mission.targetNavTab)
+                            }
                         }
                     )
                 }
@@ -614,15 +765,15 @@ fun DailyLearningTrackerSheet(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "LAST 7 DAYS",
+                                    text = "LAST 7 DAYS · ${snapshot.wordGoalDaysHitLast7}/7 HIT WORD GOAL",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "${snapshot.weeklyXpTotal} XP · ${snapshot.weeklyWordsTotal} words",
+                                    text = "${snapshot.weeklyWordsTotal} ${snapshot.wordGoalUnit.shortUnit} · ${snapshot.weeklyXpTotal} XP",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -779,13 +930,56 @@ fun DailyLearningTrackerSheet(
             }
 
             // Customize Daily Targets
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     text = "CUSTOMIZE DAILY TARGETS",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Bold
                 )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Daily Word Acquisition Target",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${snapshot.wordsGoal} ${snapshot.wordGoalUnit.shortUnit}/day · ${DailyWordGoalCalculator.formatHskScopeLabel(snapshot.wordGoalHskLevel)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    FilledTonalButton(
+                        onClick = onOpenWordGoalSetter,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.testTag("tracker_custom_goal_open_button")
+                    ) {
+                        Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Custom (1–100)")
+                    }
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(5, 10, 20, 35, 50).forEach { target ->
+                        FilterChip(
+                            selected = snapshot.wordsGoal == target,
+                            onClick = { onSetWordsGoal(target) },
+                            label = { Text("$target ${snapshot.wordGoalUnit.shortUnit}") },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = GoldAccent,
+                                selectedLabelColor = Color.White
+                            ),
+                            modifier = Modifier.testTag("words_goal_chip_$target")
+                        )
+                    }
+                }
+
                 Text(
                     text = "Daily XP Target",
                     style = MaterialTheme.typography.labelMedium,
@@ -805,28 +999,192 @@ fun DailyLearningTrackerSheet(
                         )
                     }
                 }
-                Text(
-                    text = "Daily Words Target",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(10, 20, 30, 50).forEach { target ->
-                        FilterChip(
-                            selected = snapshot.wordsGoal == target,
-                            onClick = { onSetWordsGoal(target) },
-                            label = { Text("$target words") },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = GoldAccent,
-                                selectedLabelColor = Color.White
-                            ),
-                            modifier = Modifier.testTag("words_goal_chip_$target")
-                        )
-                    }
-                }
             }
 
             Spacer(Modifier.height(10.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DailyWordAcquisitionModuleCard(
+    snapshot: DailyTrackerSnapshot,
+    onEditGoal: () -> Unit,
+    onStartDailyPack: () -> Unit,
+    onTapWord: (String) -> Unit
+) {
+    val hskScope = DailyWordGoalCalculator.formatHskScopeLabel(snapshot.wordGoalHskLevel)
+    val acquired = snapshot.todayWordGoalAcquired
+    val remaining = snapshot.remainingWordsToday
+    val unitLabel = snapshot.wordGoalUnit.shortUnit
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("daily_word_acquisition_module_card"),
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        border = BorderStroke(
+            1.4.dp,
+            if (snapshot.isWordGoalComplete) JadePrimary else GoldAccent.copy(alpha = 0.65f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Flag,
+                            contentDescription = null,
+                            tint = if (snapshot.isWordGoalComplete) JadePrimary else GoldAccent,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "Daily Word Acquisition",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                    Text(
+                        text = "$hskScope · ${snapshot.wordGoalUnit.label} · ${snapshot.wordGoalStreakDays}d goal streak",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                TextButton(
+                    onClick = onEditGoal,
+                    modifier = Modifier.testTag("tracker_edit_word_goal_button")
+                ) {
+                    Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Edit", fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "$acquired",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Black,
+                        color = if (snapshot.isWordGoalComplete) JadePrimary else MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "/ ${snapshot.wordsGoal} $unitLabel today",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = if (snapshot.isWordGoalComplete) JadeLightContainer else GoldContainer
+                ) {
+                    Text(
+                        text = if (snapshot.isWordGoalComplete) "Daily Goal Hit!" else "$remaining more to go",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (snapshot.isWordGoalComplete) JadeDeep else Color(0xFF4A3100),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            LinearProgressIndicator(
+                progress = { snapshot.wordsProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(9.dp)
+                    .clip(RoundedCornerShape(50)),
+                color = if (snapshot.isWordGoalComplete) JadePrimary else GoldAccent,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+
+            if (snapshot.todayAcquiredWords.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "ACQUIRED TODAY (${snapshot.todayAcquiredWords.size} words · ${snapshot.todayUniqueCharacters} unique 汉字)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold
+                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        snapshot.todayAcquiredWords.take(14).forEach { hanzi ->
+                            Surface(
+                                onClick = { onTapWord(hanzi) },
+                                shape = RoundedCornerShape(10.dp),
+                                color = JadeLightContainer.copy(alpha = 0.6f),
+                                border = BorderStroke(1.dp, JadePrimary.copy(alpha = 0.3f))
+                            ) {
+                                Text(
+                                    text = hanzi,
+                                    fontFamily = HanziSerifFontFamily,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = JadeDeep,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                )
+                            }
+                        }
+                        if (snapshot.todayAcquiredWords.size > 14) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            ) {
+                                Text(
+                                    text = "+${snapshot.todayAcquiredWords.size - 14} more",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    text = "Complete a lesson or tap Start Today's Pack to acquire your first new $hskScope words today.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Button(
+                onClick = onStartDailyPack,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+                    .testTag("tracker_start_daily_goal_button"),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = JadePrimary)
+            ) {
+                Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = if (remaining > 0) "Start Today's $hskScope Pack ($remaining left)" else "Learn Bonus $hskScope Words",
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }

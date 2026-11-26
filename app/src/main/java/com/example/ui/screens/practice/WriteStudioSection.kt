@@ -1,41 +1,29 @@
 package com.example.ui.screens.practice
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.AutoStories
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.Visibility
-import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,35 +34,37 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.model.WritingPracticeMode
 import com.example.ui.components.HskLevelPill
+import com.example.ui.components.InteractiveHanziWriter
 import com.example.ui.components.PandaActionButton
-import com.example.ui.theme.CoralVermilion
+import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.HanziSerifFontFamily
-import com.example.ui.theme.JadeDeep
+import com.example.ui.theme.JadeLightContainer
 import com.example.ui.theme.JadePrimary
 import com.example.viewmodel.PandaViewModel
+
+private val WriteLevelFilters = listOf(
+    "ALL" to "All HSK",
+    "1" to "HSK 1",
+    "2" to "HSK 2",
+    "3" to "HSK 3",
+    "4" to "HSK 4",
+    "5+" to "HSK 5+"
+)
 
 @Composable
 fun WriteStudioSection(viewModel: PandaViewModel) {
@@ -82,32 +72,35 @@ fun WriteStudioSection(viewModel: PandaViewModel) {
     val allVocab by viewModel.allVocab.collectAsStateWithLifecycle()
 
     val chars = remember(activeWord.hanzi) {
-        activeWord.hanzi.filter { !it.isWhitespace() }.map { it.toString() }.ifEmpty { listOf("好") }
+        activeWord.hanzi
+            .filter { ch -> !ch.isWhitespace() && Character.UnicodeScript.of(ch.code) == Character.UnicodeScript.HAN }
+            .map { it.toString() }
+            .ifEmpty {
+                activeWord.hanzi.filter { !it.isWhitespace() }.map { it.toString() }.ifEmpty { listOf("好") }
+            }
     }
     var activeCharIdx by remember(activeWord.hanzi) { mutableIntStateOf(0) }
     val activeChar = chars.getOrElse(activeCharIdx) { chars.first() }
+    val completedChars = remember(activeWord.hanzi) { mutableStateMapOf<String, Int>() }
 
-    var showOutline by remember { mutableStateOf(true) }
-    var pulseGuide by remember { mutableStateOf(false) }
     var customInput by remember { mutableStateOf("") }
-    var feedbackText by remember(activeChar) { mutableStateOf<String?>(null) }
+    var selectedLevelFilter by remember { mutableStateOf("ALL") }
 
-    val strokes = remember(activeChar) { mutableStateListOf<List<Offset>>() }
-    var activeStroke by remember(activeChar) { mutableStateOf<List<Offset>>(emptyList()) }
+    val quickPickWords = remember(allVocab, selectedLevelFilter) {
+        val base = allVocab.filter { it.writable }.ifEmpty { allVocab }
+        val filtered = when (selectedLevelFilter) {
+            "ALL" -> base
+            "5+" -> base.filter { it.hskLevel >= 5 }
+            else -> {
+                val lvl = selectedLevelFilter.toIntOrNull()
+                if (lvl != null) base.filter { it.hskLevel == lvl } else base
+            }
+        }
+        filtered.ifEmpty { base }.take(24)
+    }
 
-    val guideAlpha = if (pulseGuide) {
-        val transition = rememberInfiniteTransition(label = "guide_pulse")
-        val a by transition.animateFloat(
-            initialValue = 0.14f,
-            targetValue = 0.42f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(900, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "guide_alpha"
-        )
-        a
-    } else 0.22f
+    val allCharsMastered = chars.isNotEmpty() && chars.all { it in completedChars }
+    val nextUnfinishedIdx = chars.indices.firstOrNull { idx -> idx != activeCharIdx && chars[idx] !in completedChars }
 
     Column(
         modifier = Modifier
@@ -126,10 +119,12 @@ fun WriteStudioSection(viewModel: PandaViewModel) {
             OutlinedTextField(
                 value = customInput,
                 onValueChange = { customInput = it },
-                placeholder = { Text("Type any Hanzi (e.g. 扫码 / 森林)") },
+                placeholder = { Text("Type any Hanzi (e.g. 扫码 / 森林 / 喜欢)") },
                 singleLine = true,
                 shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("write_custom_hanzi_input")
             )
             PandaActionButton(
                 text = "Load",
@@ -138,7 +133,8 @@ fun WriteStudioSection(viewModel: PandaViewModel) {
                         viewModel.jumpToWriteHanzi(customInput)
                         customInput = ""
                     }
-                }
+                },
+                modifier = Modifier.testTag("write_load_hanzi_button")
             )
         }
 
@@ -151,14 +147,18 @@ fun WriteStudioSection(viewModel: PandaViewModel) {
         ) {
             Column(
                 modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Text(
                             text = activeWord.hanzi,
                             fontFamily = HanziSerifFontFamily,
@@ -166,247 +166,231 @@ fun WriteStudioSection(viewModel: PandaViewModel) {
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Text(
-                            text = activeWord.pinyin,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = JadePrimary
-                        )
+                        if (activeWord.pinyin.isNotBlank()) {
+                            Text(
+                                text = activeWord.pinyin,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = JadePrimary
+                            )
+                        }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         HskLevelPill(level = activeWord.hskLevel)
-                        IconButton(onClick = { viewModel.speakChinese(activeWord.hanzi) }) {
-                            Icon(Icons.AutoMirrored.Rounded.VolumeUp, contentDescription = "Listen", tint = JadePrimary)
+                        IconButton(
+                            onClick = { viewModel.speakChinese(activeWord.hanzi) },
+                            modifier = Modifier.testTag("write_speak_word_button")
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.VolumeUp,
+                                contentDescription = "Listen to pronunciation",
+                                tint = JadePrimary
+                            )
                         }
                     }
                 }
+
                 Text(
                     text = activeWord.english,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                // Multi-character selector pills
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    chars.forEachIndexed { idx, ch ->
-                        val selected = idx == activeCharIdx
-                        Surface(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { activeCharIdx = idx },
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (selected) JadePrimary else MaterialTheme.colorScheme.surfaceVariant
-                        ) {
-                            Text(
-                                text = ch,
-                                fontFamily = HanziSerifFontFamily,
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
 
-        // Mi Zi Ge Calligraphy Canvas
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = 310.dp)
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(22.dp))
-                .background(Color.White)
-                .testTag("mizige_writing_canvas"),
-            contentAlignment = Alignment.Center
-        ) {
-            // Faint Reference Character Outline
-            if (showOutline) {
-                Text(
-                    text = activeChar,
-                    fontFamily = HanziSerifFontFamily,
-                    fontSize = 190.sp,
-                    color = JadeDeep,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.alpha(guideAlpha)
-                )
-            }
-
-            // Mi Zi Ge grid + User Ink Strokes
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(activeChar) {
-                        detectDragGestures(
-                            onDragStart = { offset ->
-                                activeStroke = listOf(offset)
-                            },
-                            onDrag = { change, _ ->
-                                change.consume()
-                                activeStroke = activeStroke + change.position
-                            },
-                            onDragEnd = {
-                                if (activeStroke.size > 1) {
-                                    strokes.add(activeStroke)
+                // Multi-character selector pills with mastery checkmarks + Story shortcut
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        chars.forEachIndexed { idx, ch ->
+                            val selected = idx == activeCharIdx
+                            val score = completedChars[ch]
+                            Surface(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable { activeCharIdx = idx }
+                                    .testTag("write_char_pill_$idx"),
+                                shape = RoundedCornerShape(12.dp),
+                                color = when {
+                                    selected -> JadePrimary
+                                    score != null -> JadeLightContainer
+                                    else -> MaterialTheme.colorScheme.surfaceVariant
+                                },
+                                border = if (score != null && !selected) {
+                                    BorderStroke(1.dp, JadePrimary.copy(alpha = 0.5f))
+                                } else null
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = ch,
+                                        fontFamily = HanziSerifFontFamily,
+                                        fontSize = 20.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = when {
+                                            selected -> Color.White
+                                            score != null -> JadePrimary
+                                            else -> MaterialTheme.colorScheme.onSurface
+                                        }
+                                    )
+                                    if (score != null) {
+                                        Icon(
+                                            Icons.Rounded.CheckCircle,
+                                            contentDescription = "Character completed",
+                                            tint = if (selected) GoldAccent else JadePrimary,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                        Text(
+                                            text = "$score%",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (selected) Color.White.copy(alpha = 0.9f) else JadePrimary
+                                        )
+                                    }
                                 }
-                                activeStroke = emptyList()
-                            },
-                            onDragCancel = {
-                                activeStroke = emptyList()
                             }
-                        )
-                    }
-            ) {
-                val w = size.width
-                val h = size.height
-                val dash = PathEffect.dashPathEffect(floatArrayOf(12f, 10f), 0f)
-                val gridColor = CoralVermilion.copy(alpha = 0.35f)
-
-                // Outer Vermilion Border
-                drawRect(
-                    color = CoralVermilion,
-                    style = Stroke(width = 6f)
-                )
-                // Crosshairs
-                drawLine(gridColor, Offset(w / 2f, 0f), Offset(w / 2f, h), strokeWidth = 2.5f, pathEffect = dash)
-                drawLine(gridColor, Offset(0f, h / 2f), Offset(w, h / 2f), strokeWidth = 2.5f, pathEffect = dash)
-                // Diagonals (Mi Zi Ge 米)
-                drawLine(gridColor.copy(alpha = 0.25f), Offset(0f, 0f), Offset(w, h), strokeWidth = 2f, pathEffect = dash)
-                drawLine(gridColor.copy(alpha = 0.25f), Offset(w, 0f), Offset(0f, h), strokeWidth = 2f, pathEffect = dash)
-
-                // Draw committed strokes with calligraphy brush feel
-                val allPaths = strokes + listOfNotNull(activeStroke.takeIf { it.size > 1 })
-                allPaths.forEach { pts ->
-                    val path = Path().apply {
-                        moveTo(pts.first().x, pts.first().y)
-                        for (i in 1 until pts.size) {
-                            lineTo(pts[i].x, pts[i].y)
                         }
                     }
-                    drawPath(
-                        path = path,
-                        color = Color(0xFF0F2B24),
-                        style = Stroke(
-                            width = 20f,
-                            cap = StrokeCap.Round,
-                            join = StrokeJoin.Round
+
+                    Spacer(Modifier.width(8.dp))
+
+                    OutlinedButton(
+                        onClick = { viewModel.openWordBreakdown(activeWord) },
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.testTag("write_word_breakdown_button")
+                    ) {
+                        Icon(
+                            Icons.Rounded.AutoStories,
+                            contentDescription = "Word story and radicals",
+                            modifier = Modifier.size(16.dp),
+                            tint = JadePrimary
                         )
-                    )
+                        Spacer(Modifier.width(4.dp))
+                        Text("Radicals", style = MaterialTheme.typography.labelMedium)
+                    }
                 }
-            }
-
-            // Stroke Counter Badge
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(10.dp),
-                shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
-            ) {
-                Text(
-                    text = "${strokes.size} strokes",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                )
             }
         }
 
-        // Calligraphy Controls
-        Row(
+        // Interactive Animated Stroke-Order & Canvas Feedback Component
+        InteractiveHanziWriter(
+            character = activeChar,
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedButton(
-                onClick = { showOutline = !showOutline },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(14.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
-            ) {
-                Icon(
-                    if (showOutline) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
-                    contentDescription = "Toggle outline",
-                    modifier = Modifier.size(16.dp)
+            initialMode = WritingPracticeMode.GUIDED,
+            onCharacterCompleted = { completedChar, accuracy, isQuiz ->
+                val prev = completedChars[completedChar] ?: 0
+                completedChars[completedChar] = maxOf(prev, accuracy)
+                viewModel.recordWritingPracticeComplete(
+                    char = completedChar,
+                    accuracyPercent = accuracy,
+                    isQuizMode = isQuiz
                 )
-                Spacer(Modifier.width(4.dp))
-                Text(if (showOutline) "Hide Guide" else "Guide", style = MaterialTheme.typography.labelMedium)
             }
-
-            OutlinedButton(
-                onClick = { pulseGuide = !pulseGuide },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(14.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
-            ) {
-                Text(if (pulseGuide) "Stop Pulse" else "Trace Pulse", style = MaterialTheme.typography.labelMedium)
-            }
-
-            IconButton(
-                onClick = { if (strokes.isNotEmpty()) strokes.removeAt(strokes.lastIndex) },
-                enabled = strokes.isNotEmpty()
-            ) {
-                Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "Undo stroke")
-            }
-
-            IconButton(
-                onClick = {
-                    strokes.clear()
-                    feedbackText = null
-                }
-            ) {
-                Icon(Icons.Rounded.DeleteOutline, contentDescription = "Clear canvas")
-            }
-        }
-
-        PandaActionButton(
-            text = "Check Calligraphy (+15 XP)",
-            onClick = {
-                if (strokes.isEmpty()) {
-                    feedbackText = "Draw '$activeChar' inside the red Mi Zi Ge grid first!"
-                } else {
-                    feedbackText = "Great brush balance on '$activeChar' (${strokes.size} strokes)! Keep strokes top-to-bottom and left-to-right."
-                    viewModel.awardXp(15L, null, "Calligraphy practice: $activeChar")
-                    viewModel.speakChinese(activeChar)
-                }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("check_calligraphy_button"),
-            leadingIcon = { Icon(Icons.Rounded.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp)) }
         )
 
-        if (feedbackText != null) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                Text(
-                    text = feedbackText!!,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.padding(12.dp)
-                )
+        // Multi-character flow banner: move to next character or celebrate full word mastery
+        if (chars.size > 1 && activeChar in completedChars) {
+            if (nextUnfinishedIdx != null) {
+                FilledTonalButton(
+                    onClick = { activeCharIdx = nextUnfinishedIdx },
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("write_next_char_button")
+                ) {
+                    Text(
+                        text = "Practice Next Character: ${chars[nextUnfinishedIdx]}",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        Icons.AutoMirrored.Rounded.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            } else if (allCharsMastered) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = JadeLightContainer,
+                    border = BorderStroke(1.dp, JadePrimary.copy(alpha = 0.4f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.CheckCircle,
+                            contentDescription = null,
+                            tint = JadePrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "All ${chars.size} characters of 「${activeWord.hanzi}」 mastered! Pick another HSK word below.",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = JadePrimary
+                        )
+                    }
+                }
             }
         }
 
-        // Quick Pick Writable HSK Words
+        // Quick Pick HSK 3.0 Vocabulary with Level Filter Chips
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Quick Pick Writable HSK 3.0 Words",
+                text = "Quick Pick HSK 3.0 Vocabulary",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                WriteLevelFilters.forEach { (key, label) ->
+                    val isSelected = selectedLevelFilter == key
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { selectedLevelFilter = key },
+                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = JadePrimary,
+                            selectedLabelColor = Color.White
+                        ),
+                        modifier = Modifier.testTag("write_level_filter_$key")
+                    )
+                }
+            }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                allVocab.filter { it.writable }.take(18).forEach { w ->
+                quickPickWords.forEach { w ->
                     val selected = w.hanzi == activeWord.hanzi
                     Surface(
                         modifier = Modifier
@@ -414,7 +398,10 @@ fun WriteStudioSection(viewModel: PandaViewModel) {
                             .clickable { viewModel.jumpToWriteWord(w) },
                         shape = RoundedCornerShape(14.dp),
                         color = if (selected) JadePrimary else MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.dp, if (selected) JadePrimary else MaterialTheme.colorScheme.outline)
+                        border = BorderStroke(
+                            1.dp,
+                            if (selected) JadePrimary else MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+                        )
                     ) {
                         Column(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -430,7 +417,7 @@ fun WriteStudioSection(viewModel: PandaViewModel) {
                             Text(
                                 text = w.pinyin,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (selected) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                color = if (selected) Color.White.copy(alpha = 0.88f) else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
