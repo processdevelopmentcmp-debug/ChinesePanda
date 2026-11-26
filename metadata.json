@@ -1,0 +1,6 @@
+{
+  "name": "PandaChinese",
+  "description": "Complete HSK 3.0 Chinese learning app with AI teacher, stroke writing, tone coach, listening tests, graded stories, and SM-2 spaced repetition.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

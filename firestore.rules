@@ -1,0 +1,278 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny all access by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened reusable helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Entity validation helpers
+    function isValidUserProfile(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.displayName is string &&
+             data.displayName.size() >= 1 &&
+             data.displayName.size() <= 60 &&
+             data.xp is int &&
+             data.xp >= 0 &&
+             data.xp <= 10000000 &&
+             data.streak is int &&
+             data.streak >= 0 &&
+             data.streak <= 10000 &&
+             data.hearts is int &&
+             data.hearts >= 0 &&
+             data.hearts <= 5 &&
+             data.currentHskLevel is int &&
+             data.currentHskLevel >= 1 &&
+             data.currentHskLevel <= 9 &&
+             data.completedUnitIds is list &&
+             data.completedUnitIds.size() <= 50 &&
+             (data.completedUnitIds.size() == 0 || data.completedUnitIds[0] is string) &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    function isValidCustomWord(data) {
+      return data.hanzi is string &&
+             data.hanzi.size() >= 1 &&
+             data.hanzi.size() <= 30 &&
+             data.pinyin is string &&
+             data.pinyin.size() >= 1 &&
+             data.pinyin.size() <= 100 &&
+             data.english is string &&
+             data.english.size() >= 1 &&
+             data.english.size() <= 200 &&
+             data.hskLevel is int &&
+             data.hskLevel >= 1 &&
+             data.hskLevel <= 9 &&
+             data.topicId is int &&
+             data.topicId >= 1 &&
+             data.topicId <= 14 &&
+             data.writable is bool &&
+             data.exampleHanzi is string &&
+             data.exampleHanzi.size() <= 200 &&
+             data.examplePinyin is string &&
+             data.examplePinyin.size() <= 250 &&
+             data.exampleEnglish is string &&
+             data.exampleEnglish.size() <= 250 &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    function isValidSrsCard(data) {
+      return data.wordKey is string &&
+             data.wordKey.size() >= 1 &&
+             data.wordKey.size() <= 40 &&
+             data.hanzi is string &&
+             data.hanzi.size() >= 1 &&
+             data.hanzi.size() <= 30 &&
+             data.pinyin is string &&
+             data.pinyin.size() >= 1 &&
+             data.pinyin.size() <= 100 &&
+             data.english is string &&
+             data.english.size() >= 1 &&
+             data.english.size() <= 200 &&
+             data.hskLevel is int &&
+             data.hskLevel >= 1 &&
+             data.hskLevel <= 9 &&
+             data.exampleHanzi is string &&
+             data.exampleHanzi.size() <= 200 &&
+             data.repetitions is int &&
+             data.repetitions >= 0 &&
+             data.repetitions <= 1000 &&
+             data.intervalDays is int &&
+             data.intervalDays >= 0 &&
+             data.intervalDays <= 3650 &&
+             data.easeFactor is number &&
+             data.easeFactor >= 1.3 &&
+             data.easeFactor <= 5.0 &&
+             data.lapses is int &&
+             data.lapses >= 0 &&
+             data.lapses <= 1000 &&
+             data.nextReviewEpochMs is int &&
+             data.nextReviewEpochMs >= 0 &&
+             (!('mnemonicHint' in data) || (data.mnemonicHint is string && data.mnemonicHint.size() <= 500)) &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    function isValidSavedStory(data) {
+      return data.titleZh is string &&
+             data.titleZh.size() >= 1 &&
+             data.titleZh.size() <= 100 &&
+             data.titleEn is string &&
+             data.titleEn.size() >= 1 &&
+             data.titleEn.size() <= 120 &&
+             data.hskLevel is int &&
+             data.hskLevel >= 1 &&
+             data.hskLevel <= 9 &&
+             data.topicName is string &&
+             data.topicName.size() >= 1 &&
+             data.topicName.size() <= 80 &&
+             data.sentences is list &&
+             data.sentences.size() >= 1 &&
+             data.sentences.size() <= 20 &&
+             data.sentences[0] is map &&
+             data.quizQuestion is string &&
+             data.quizQuestion.size() >= 1 &&
+             data.quizQuestion.size() <= 250 &&
+             data.quizOptions is list &&
+             data.quizOptions.size() >= 2 &&
+             data.quizOptions.size() <= 4 &&
+             data.quizOptions[0] is string &&
+             data.quizCorrectIndex is int &&
+             data.quizCorrectIndex >= 0 &&
+             data.quizCorrectIndex <= 3 &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    // 1. User Profile Collection
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'displayName', 'xp', 'streak', 'hearts',
+                         'currentHskLevel', 'completedUnitIds', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'displayName', 'xp', 'streak', 'hearts',
+                         'currentHskLevel', 'completedUnitIds', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidUserProfile(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'displayName', 'xp', 'streak', 'hearts',
+                         'currentHskLevel', 'completedUnitIds', 'updatedAt'
+                       ]);
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      // 2. Custom & AI-Generated Words Subcollection
+      match /custom_words/{wordId} {
+        allow get: if isOwner(userId) && isValidId(wordId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(wordId) &&
+                         incoming().keys().hasAll([
+                           'hanzi', 'pinyin', 'english', 'hskLevel', 'topicId',
+                           'writable', 'exampleHanzi', 'examplePinyin', 'exampleEnglish',
+                           'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'hanzi', 'pinyin', 'english', 'hskLevel', 'topicId',
+                           'writable', 'exampleHanzi', 'examplePinyin', 'exampleEnglish',
+                           'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidCustomWord(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(wordId) &&
+                         isValidCustomWord(incoming()) &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'hanzi', 'pinyin', 'english', 'hskLevel', 'topicId',
+                           'writable', 'exampleHanzi', 'examplePinyin', 'exampleEnglish',
+                           'updatedAt'
+                         ]);
+
+        allow delete: if isOwner(userId) && isValidId(wordId);
+      }
+
+      // 3. SM-2 Spaced Repetition Cards Subcollection
+      match /srs_cards/{cardId} {
+        allow get: if isOwner(userId) && isValidId(cardId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(cardId) &&
+                         incoming().keys().hasAll([
+                           'wordKey', 'hanzi', 'pinyin', 'english', 'hskLevel',
+                           'exampleHanzi', 'repetitions', 'intervalDays', 'easeFactor',
+                           'lapses', 'nextReviewEpochMs', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'wordKey', 'hanzi', 'pinyin', 'english', 'hskLevel',
+                           'exampleHanzi', 'repetitions', 'intervalDays', 'easeFactor',
+                           'lapses', 'nextReviewEpochMs', 'mnemonicHint', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidSrsCard(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(cardId) &&
+                         isValidSrsCard(incoming()) &&
+                         incoming().wordKey == existing().wordKey &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'repetitions', 'intervalDays', 'easeFactor', 'lapses',
+                           'nextReviewEpochMs', 'mnemonicHint', 'updatedAt'
+                         ]);
+
+        allow delete: if isOwner(userId) && isValidId(cardId);
+      }
+
+      // 4. AI-Generated Saved Graded Stories Subcollection
+      match /saved_stories/{storyId} {
+        allow get: if isOwner(userId) && isValidId(storyId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(storyId) &&
+                         incoming().keys().hasAll([
+                           'titleZh', 'titleEn', 'hskLevel', 'topicName',
+                           'sentences', 'quizQuestion', 'quizOptions',
+                           'quizCorrectIndex', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'titleZh', 'titleEn', 'hskLevel', 'topicName',
+                           'sentences', 'quizQuestion', 'quizOptions',
+                           'quizCorrectIndex', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidSavedStory(incoming());
+
+        allow update: if false;
+
+        allow delete: if isOwner(userId) && isValidId(storyId);
+      }
+    }
+  }
+}

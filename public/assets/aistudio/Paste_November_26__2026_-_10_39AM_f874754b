@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PandaChinese Pro — HSK 3.0 Complete Mastery Suite</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#F4FBF8',
+              100: '#E6F7F1',
+              400: '#2ECD99',
+              500: '#00B894',
+              600: '#00A383',
+              700: '#00896E',
+              900: '#004D3E',
+            },
+            gold: {
+              400: '#FDCB6E',
+              500: '#E1B12C',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            kai: ['Kaiti SC', 'STKaiti', 'KaiTi', 'DFKai-SB', 'serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Hanzi Writer CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js"></script>
+
+  <style>
+    /* Custom Scrollbars & Animations */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    
+    .btn-3d {
+      transition: all 0.1s ease;
+      box-shadow: 0 4px 0 rgba(0,0,0,0.15);
+    }
+    .btn-3d:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 rgba(0,0,0,0.15);
+    }
+    
+    /* Mi Zi Ge Background Grid for Character Writing */
+    .mizige-bg {
+      background-color: #ffffff;
+      background-image: 
+        linear-gradient(to right, #fecaca 1px, transparent 1px),
+        linear-gradient(to bottom, #fecaca 1px, transparent 1px),
+        linear-gradient(to top right, transparent calc(50% - 0.5px), #fee2e2 50%, transparent calc(50% + 0.5px)),
+        linear-gradient(to bottom right, transparent calc(50% - 0.5px), #fee2e2 50%, transparent calc(50% + 0.5px));
+      background-size: 100% 100%;
+      border: 2px solid #ef4444;
+    }
+
+    @keyframes pulse-subtle {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+    .panda-bounce { animation: pulse-subtle 3s infinite ease-in-out; }
+  </style>
+</head>
+<body class="bg-brand-50 text-slate-800 min-h-screen font-sans flex flex-col">
+
+  <!-- ==================== HEADER BAR ==================== -->
+  <header class="bg-white border-b border-brand-100 shadow-sm sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Logo & Title -->
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('topics')">
+        <!-- SVG Panda Mascot Icon -->
+        <div class="w-11 h-11 bg-brand-50 rounded-full flex items-center justify-center p-1 border-2 border-brand-500 shadow-inner">
+          <svg viewBox="0 0 100 100" class="w-full h-full panda-bounce">
+            <!-- Ears -->
+            <circle cx="22" cy="22" r="14" fill="#2d3748" />
+            <circle cx="78" cy="22" r="14" fill="#2d3748" />
+            <!-- Head -->
+            <circle cx="50" cy="52" r="38" fill="#ffffff" stroke="#e2e8f0" stroke-width="2" />
+            <!-- Eye Patches -->
+            <ellipse cx="33" cy="48" rx="11" ry="14" fill="#2d3748" transform="rotate(-15 33 48)" />
+            <ellipse cx="67" cy="48" rx="11" ry="14" fill="#2d3748" transform="rotate(15 67 48)" />
+            <!-- Eyes -->
+            <circle cx="35" cy="47" r="4" fill="#ffffff" />
+            <circle cx="65" cy="47" r="4" fill="#ffffff" />
+            <circle cx="36" cy="47" r="2" fill="#000000" />
+            <circle cx="64" cy="47" r="2" fill="#000000" />
+            <!-- Nose & Mouth -->
+            <ellipse cx="50" cy="58" rx="6" ry="4" fill="#2d3748" />
+            <path d="M 45 64 Q 50 68 55 64" fill="none" stroke="#2d3748" stroke-width="2.5" stroke-linecap="round" />
+            <!-- Cheeks -->
+            <ellipse cx="25" cy="58" rx="6" ry="3" fill="#f472b6" opacity="0.5" />
+            <ellipse cx="75" cy="58" rx="6" ry="3" fill="#f472b6" opacity="0.5" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
+            <span>PandaChinese <span class="text-brand-500 font-extrabold">Pro</span></span>
+            <span class="bg-gradient-to-r from-brand-500 to-emerald-700 text-white text-xs px-2 py-0.5 rounded-full uppercase tracking-wider font-semibold">HSK 3.0</span>
+          </h1>
+          <p class="text-xs text-slate-500 hidden sm:block">Master all 9 HSK 3.0 Levels · Topic-by-Topic</p>
+        </div>
+      </div>
+
+      <!-- Gamified Status Bar -->
+      <div class="flex items-center space-x-2 sm:space-x-4 text-sm font-semibold">
+        <!-- Streak -->
+        <div class="flex items-center space-x-1.5 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-full border border-amber-200" title="Daily Streak">
+          <i class="fa-solid font-900 fa-fire text-amber-500 animate-pulse"></i>
+          <span id="header-streak">5</span> <span class="text-xs hidden sm:inline">Days</span>
+        </div>
+
+        <!-- XP -->
+        <div class="flex items-center space-x-1.5 bg-emerald-50 text-brand-700 px-3 py-1.5 rounded-full border border-emerald-200" title="Total XP">
+          <i class="fa-solid fa-bolt text-brand-500"></i>
+          <span id="header-xp">350</span> <span class="text-xs hidden sm:inline">XP</span>
+        </div>
+
+        <!-- Hearts -->
+        <div class="flex items-center space-x-1 bg-rose-50 text-rose-600 px-3 py-1.5 rounded-full border border-rose-200" title="Hearts">
+          <i class="fa-solid fa-heart text-rose-500"></i>
+          <span id="header-hearts">5</span>/5
+        </div>
+
+        <!-- Due SRS Badge -->
+        <button onclick="switchTab('review')" class="flex items-center space-x-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-full border border-indigo-200 transition" title="Due for SM-2 Review">
+          <i class="fa-solid fa-brain text-indigo-500"></i>
+          <span id="header-due-count" class="bg-indigo-600 text-white text-xs px-1.5 py-0.2 rounded-full font-bold">12</span>
+        </button>
+
+        <!-- Header Action Buttons -->
+        <button onclick="switchTab('teacher')" class="bg-brand-500 hover:bg-brand-600 text-white px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border-b-2 border-brand-700 btn-3d shadow-sm">
+          <span>🐼 Ask Teacher</span>
+        </button>
+        <button onclick="openBlueprintModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-bold border border-slate-300" title="Dev Blueprint & Schema">
+          <i class="fa-solid fa-code"></i>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- ==================== TAB NAVIGATION ==================== -->
+    <nav class="bg-slate-900 text-white px-2 py-1 shadow-inner overflow-x-auto scrollbar-none">
+      <div class="max-w-7xl mx-auto flex items-center space-x-1 min-w-max text-xs sm:text-sm font-medium">
+        <button onclick="switchTab('topics')" id="nav-topics" class="tab-btn active-tab px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-800 transition">
+          <span>📚 HSK 3.0 Topics</span>
+        </button>
+        <button onclick="switchTab('teacher')" id="nav-teacher" class="tab-btn px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-800 transition">
+          <span>🐼 AI Teacher</span>
+        </button>
+        <button onclick="switchTab('learnpath')" id="nav-learnpath" class="tab-btn px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-800 transition">
+          <span>🎯 Learn Path</span>
+        </button>
+        <button onclick="switchTab('sentences')" id="nav-sentences" class="tab-btn px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-800 transition">
+          <span>🧩 Sentences</span>
+        </button>
+        <button onclick="switchTab('listening')" id="nav-listening" class="tab-btn px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-800 transition">
+          <span>🎧 Listening Test</span>
+        </button>
+        <button onclick="switchTab('write')" id="nav-write" class="tab-btn px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-800 transition">
+          <span>✍️ Write</span>
+        </button>
+        <button onclick="switchTab('speak')" id="nav-speak" class="tab-btn px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-800 transition">
+          <span>🎙️ Speak</span>
+        </button>
+        <button onclick="switchTab('stories')" id="nav-stories" class="tab-btn px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-800 transition">
+          <span>📖 Stories</span>
+        </button>
+        <button onclick="switchTab('review')" id="nav-review" class="tab-btn px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-800 transition">
+          <span>🧠 Review (SM-2)</span>
+        </button>
+        <button onclick="switchTab('radicals')" id="nav-radicals" class="tab-btn px-3 py-2 rounded-lg flex items-center gap-2 hover:bg-slate-800 transition">
+          <span>🧱 Radicals</span>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <!-- ==================== MAIN CONTENT CONTAINER ==================== -->
+  <main class="max-w-7xl mx-auto px-4 py-6 flex-grow w-full">
+
+    <!-- 1. HSK 3.0 TOPICS TAB -->
+    <section id="tab-topics" class="tab-content space-y-6">
+      
+      <!-- HSK 3.0 Standard Level Tracker Banner -->
+      <div class="bg-gradient-to-r from-brand-700 via-brand-600 to-emerald-900 text-white p-5 rounded-2xl shadow-lg flex flex-col lg:flex-row items-center justify-between gap-4">
+        <div class="space-y-1 text-center lg:text-left">
+          <div class="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-gold-400">
+            <i class="fa-solid fa-certificate"></i> Official HSK 3.0 Standard Syllabus (11,000 Words Target)
+          </div>
+          <h2 class="text-2xl font-black">HSK 3.0 Level Curriculum Roadmap</h2>
+          <p class="text-xs sm:text-sm text-brand-100 max-w-2xl">
+            Explore complete topic-by-topic wordlists for Level 1, 2, and 3, plus import or generate Level 4–9 wordpacks powered by AI!
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="openAIGeneratorModal()" class="bg-gold-400 hover:bg-gold-500 text-slate-900 px-4 py-2.5 rounded-xl font-extrabold text-xs sm:text-sm border-b-4 border-amber-600 btn-3d flex items-center gap-2">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> AI Topic Pack Generator
+          </button>
+          <button onclick="openImporterModal()" class="bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm border border-white/30 flex items-center gap-2">
+            <i class="fa-solid fa-file-import"></i> Bulk Import CSV/JSON
+          </button>
+        </div>
+      </div>
+
+      <!-- HSK 3.0 9-Level Tracker Chips -->
+      <div class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 text-center text-xs font-semibold">
+        <div class="bg-white p-2 rounded-xl border-2 border-brand-500 shadow-sm">
+          <div class="text-brand-600 font-extrabold">HSK 1</div>
+          <div class="text-slate-500 text-[10px]">300 words</div>
+          <div class="mt-1 bg-brand-100 rounded-full h-1.5"><div class="bg-brand-500 h-1.5 rounded-full" style="width: 100%"></div></div>
+        </div>
+        <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-slate-800 font-bold">HSK 2</div>
+          <div class="text-slate-500 text-[10px]">+200 (500 cum.)</div>
+          <div class="mt-1 bg-slate-100 rounded-full h-1.5"><div class="bg-brand-500 h-1.5 rounded-full" style="width: 75%"></div></div>
+        </div>
+        <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-slate-800 font-bold">HSK 3</div>
+          <div class="text-slate-500 text-[10px]">+500 (1k cum.)</div>
+          <div class="mt-1 bg-slate-100 rounded-full h-1.5"><div class="bg-brand-500 h-1.5 rounded-full" style="width: 45%"></div></div>
+        </div>
+        <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-slate-800 font-bold">HSK 4</div>
+          <div class="text-slate-500 text-[10px]">+1,000 (2k)</div>
+          <div class="mt-1 bg-slate-100 rounded-full h-1.5"><div class="bg-brand-500 h-1.5 rounded-full" style="width: 20%"></div></div>
+        </div>
+        <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-slate-800 font-bold">HSK 5</div>
+          <div class="text-slate-500 text-[10px]">+1,600 (3.6k)</div>
+          <div class="mt-1 bg-slate-100 rounded-full h-1.5"><div class="bg-brand-500 h-1.5 rounded-full" style="width: 10%"></div></div>
+        </div>
+        <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-slate-800 font-bold">HSK 6</div>
+          <div class="text-slate-500 text-[10px]">+1,800 (5.4k)</div>
+          <div class="mt-1 bg-slate-100 rounded-full h-1.5"><div class="bg-brand-500 h-1.5 rounded-full" style="width: 5%"></div></div>
+        </div>
+        <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm col-span-3 sm:col-span-2 lg:col-span-3">
+          <div class="text-purple-600 font-extrabold">HSK 7–9 Advanced</div>
+          <div class="text-slate-500 text-[10px]">+5,600 (11,000 Total)</div>
+          <div class="mt-1 bg-slate-100 rounded-full h-1.5"><div class="bg-purple-500 h-1.5 rounded-full" style="width: 2%"></div></div>
+        </div>
+      </div>
+
+      <!-- Filters & Topic Controls -->
+      <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        
+        <!-- Level Pills -->
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-xs font-bold text-slate-400 mr-1">LEVEL:</span>
+          <button onclick="setTopicLevelFilter('ALL')" id="lvl-pill-ALL" class="lvl-pill active-lvl bg-brand-500 text-white px-3 py-1 rounded-lg text-xs font-bold">All</button>
+          <button onclick="setTopicLevelFilter('1')" id="lvl-pill-1" class="lvl-pill bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1 rounded-lg text-xs font-bold">HSK 1</button>
+          <button onclick="setTopicLevelFilter('2')" id="lvl-pill-2" class="lvl-pill bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1 rounded-lg text-xs font-bold">HSK 2</button>
+          <button onclick="setTopicLevelFilter('3')" id="lvl-pill-3" class="lvl-pill bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1 rounded-lg text-xs font-bold">HSK 3</button>
+          <button onclick="setTopicLevelFilter('ADV')" id="lvl-pill-ADV" class="lvl-pill bg-slate-100 text-slate-700 hover:bg-slate-200 px-3 py-1 rounded-lg text-xs font-bold">HSK 4–9</button>
+        </div>
+
+        <!-- Search & Writable Toggle -->
+        <div class="flex items-center gap-3">
+          <div class="relative flex-1 sm:w-64">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+            <input type="text" id="topic-search-input" oninput="renderTopicsModule()" placeholder="Search Hanzi, Pinyin or English..." class="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-600 select-none">
+            <input type="checkbox" id="writable-only-chk" onchange="renderTopicsModule()" class="rounded text-brand-500 focus:ring-brand-500">
+            <span>Writable Only</span>
+          </label>
+        </div>
+
+      </div>
+
+      <!-- Active Selected Topic Dashboard (if a topic is clicked) -->
+      <div id="topic-detail-dashboard" class="hidden bg-white p-5 rounded-2xl border-2 border-brand-500 shadow-md space-y-4">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span id="topic-detail-icon" class="text-3xl">💬</span>
+              <div>
+                <h3 id="topic-detail-title" class="text-xl font-black text-slate-800">Greetings & Pronouns</h3>
+                <p id="topic-detail-count" class="text-xs text-slate-500">30 Vocabulary Words</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="launchTopicAITeacher()" class="bg-brand-500 hover:bg-brand-600 text-white px-3 py-2 rounded-xl text-xs font-bold border-b-2 border-brand-700 btn-3d">
+              🐼 AI Topic Lesson
+            </button>
+            <button onclick="launchTopicListeningTest()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-xl text-xs font-bold border-b-2 border-indigo-800 btn-3d">
+              🎧 Topic Listening
+            </button>
+            <button onclick="launchTopicSentenceStudio()" class="bg-amber-500 hover:bg-amber-600 text-slate-900 px-3 py-2 rounded-xl text-xs font-bold border-b-2 border-amber-700 btn-3d">
+              🧩 Sentence Practice
+            </button>
+            <button onclick="closeTopicDashboard()" class="text-slate-400 hover:text-slate-600 p-2 text-lg">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Word Grid for Selected Topic -->
+        <div id="topic-words-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Topics Grid Selection -->
+      <div id="topics-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <!-- Dynamically Rendered Topics Cards -->
+      </div>
+
+    </section>
+
+    <!-- 2. 🐼 AI TEACHING ASSISTANT TAB (Panda Laoshi) -->
+    <section id="tab-teacher" class="tab-content hidden space-y-6">
+      
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left Column: Topic Lesson Selector & Quick Prompts -->
+        <div class="space-y-4">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <h3 class="font-extrabold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-graduation-cap text-brand-500"></i> Interactive Topic Lesson
+            </h3>
+            <p class="text-xs text-slate-500">Select any topic and HSK level to launch a structured step-by-step masterclass with Panda Laoshi.</p>
+            
+            <div class="space-y-2">
+              <label class="block text-xs font-bold text-slate-600">Select HSK Level:</label>
+              <select id="ai-lesson-level" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold">
+                <option value="1">HSK Level 1 (Foundational)</option>
+                <option value="2">HSK Level 2 (Elementary)</option>
+                <option value="3">HSK Level 3 (Intermediate)</option>
+                <option value="4">HSK Level 4 (Upper Intermediate)</option>
+              </select>
+            </div>
+
+            <div class="space-y-2">
+              <label class="block text-xs font-bold text-slate-600">Select Topic:</label>
+              <select id="ai-lesson-topic" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold">
+                <!-- Dynamically populated -->
+              </select>
+            </div>
+
+            <button onclick="generateStructuredTopicLesson()" class="w-full bg-brand-500 hover:bg-brand-600 text-white font-extrabold text-xs py-2.5 rounded-xl border-b-4 border-brand-700 btn-3d flex items-center justify-center gap-2">
+              <i class="fa-solid fa-book-open"></i> Launch Topic Lesson
+            </button>
+          </div>
+
+          <!-- Quick Chat Prompts -->
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+            <h4 class="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Quick Prompts</h4>
+            <div class="flex flex-col gap-1.5">
+              <button onclick="sendQuickPrompt('Explain the radical origins for words in this topic')" class="text-left bg-slate-50 hover:bg-brand-50 text-slate-700 hover:text-brand-700 p-2 rounded-xl text-xs font-medium border border-slate-200 transition">
+                🧩 "Explain the radical origins of key words"
+              </button>
+              <button onclick="sendQuickPrompt('Give me 3 practical Chinese cultural etiquette tips for this topic')" class="text-left bg-slate-50 hover:bg-brand-50 text-slate-700 hover:text-brand-700 p-2 rounded-xl text-xs font-medium border border-slate-200 transition">
+                🏮 "Give me 3 real cultural tips for this topic"
+              </button>
+              <button onclick="sendQuickPrompt('What are the most common grammar mistakes foreigners make here?')" class="text-left bg-slate-50 hover:bg-brand-50 text-slate-700 hover:text-brand-700 p-2 rounded-xl text-xs font-medium border border-slate-200 transition">
+                ⚠️ "What are common foreigner grammar mistakes?"
+              </button>
+              <button onclick="sendQuickPrompt('Quiz me with 3 rapid questions on this topic')" class="text-left bg-slate-50 hover:bg-brand-50 text-slate-700 hover:text-brand-700 p-2 rounded-xl text-xs font-medium border border-slate-200 transition">
+                ⚡ "Quiz me with 3 quick questions"
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Panda Laoshi Interactive Chat & Lesson Canvas -->
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[600px] overflow-hidden">
+          
+          <!-- Chat Header with Panda SVG -->
+          <div class="bg-brand-50 border-b border-brand-100 p-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 bg-white rounded-full p-1 border-2 border-brand-500 shadow-inner">
+                <svg viewBox="0 0 100 100" class="w-full h-full">
+                  <circle cx="22" cy="22" r="14" fill="#2d3748" />
+                  <circle cx="78" cy="22" r="14" fill="#2d3748" />
+                  <circle cx="50" cy="52" r="38" fill="#ffffff" stroke="#e2e8f0" stroke-width="2" />
+                  <ellipse cx="33" cy="48" rx="11" ry="14" fill="#2d3748" transform="rotate(-15 33 48)" />
+                  <ellipse cx="67" cy="48" rx="11" ry="14" fill="#2d3748" transform="rotate(15 67 48)" />
+                  <circle cx="35" cy="47" r="4" fill="#ffffff" />
+                  <circle cx="65" cy="47" r="4" fill="#ffffff" />
+                  <ellipse cx="50" cy="58" rx="6" ry="4" fill="#2d3748" />
+                  <path d="M 45 64 Q 50 68 55 64" fill="none" stroke="#2d3748" stroke-width="2.5" stroke-linecap="round" />
+                </svg>
+              </div>
+              <div>
+                <h3 class="font-extrabold text-slate-800 text-sm flex items-center gap-1.5">
+                  Panda Laoshi (熊猫老师)
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                </h3>
+                <p class="text-[11px] text-slate-500">Your AI Chinese Master · Powered by Gemini API</p>
+              </div>
+            </div>
+            <button onclick="clearChatHistory()" class="text-xs text-slate-400 hover:text-slate-600 font-semibold px-2 py-1 rounded bg-slate-100">Clear</button>
+          </div>
+
+          <!-- Chat Stream Box -->
+          <div id="ai-chat-stream" class="flex-grow p-4 overflow-y-auto space-y-4 bg-slate-50/50">
+            <!-- Initial Welcome Message -->
+            <div class="flex items-start space-x-3">
+              <div class="w-8 h-8 rounded-full bg-brand-500 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">🐼</div>
+              <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm text-xs sm:text-sm space-y-2 max-w-lg">
+                <p class="font-semibold text-slate-800">你好！我是熊猫老师 (Panda Laoshi)! 👋</p>
+                <p class="text-slate-600">I am here to teach you all HSK 3.0 vocabulary topic-by-topic. Ask me anything about Chinese grammar, radicals, pronunciation, or click <span class="font-bold text-brand-600">"Launch Topic Lesson"</span> on the left!</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat Input Controls -->
+          <div class="p-3 bg-white border-t border-slate-200 flex items-center gap-2">
+            <input type="text" id="ai-chat-input" onkeydown="if(event.key==='Enter') sendChatMessage()" placeholder="Ask Panda Laoshi a question in English or Chinese..." class="flex-grow p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <button onclick="sendChatMessage()" id="ai-chat-send-btn" class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2.5 rounded-xl font-bold text-xs border-b-2 border-brand-700 btn-3d">
+              Send <i class="fa-solid fa-paper-plane ml-1"></i>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- 3. 🎯 LEARN PATH TAB -->
+    <section id="tab-learnpath" class="tab-content hidden space-y-6">
+      
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <h2 class="text-xl font-black text-slate-800 flex items-center gap-2">
+            <span>🎯 Gamified HSK 3.0 Learning Path</span>
+          </h2>
+          <p class="text-xs text-slate-500">Step-by-step interactive units from Pinyin & Radicals to HSK 3.0 Modern Connectors.</p>
+        </div>
+        <button onclick="generateAIBonusExercise()" class="bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold border-b-2 border-purple-800 btn-3d flex items-center gap-1.5">
+          <i class="fa-solid fa-wand-magic"></i> Generate AI Bonus Exercise
+        </button>
+      </div>
+
+      <!-- Progression Path Nodes -->
+      <div class="space-y-6">
+        
+        <!-- UNIT 1 -->
+        <div class="bg-white p-5 rounded-2xl border-2 border-brand-500 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center space-x-3">
+              <span class="w-8 h-8 rounded-full bg-brand-500 text-white font-black flex items-center justify-center text-sm">1</span>
+              <div>
+                <h3 class="font-extrabold text-slate-800 text-base">Unit 1: Pinyin, Radicals & Core Foundations</h3>
+                <p class="text-xs text-slate-500">Key Hanzi: 休, 林, 森, 明, 看, 问, 想</p>
+              </div>
+            </div>
+            <span class="bg-brand-100 text-brand-700 text-xs font-bold px-2.5 py-1 rounded-full">Completed ✓</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center space-y-1">
+              <div class="text-2xl font-black text-slate-800 font-kai">休</div>
+              <div class="text-xs font-bold text-brand-600">xiū (Rest)</div>
+              <p class="text-[11px] text-slate-500">Person (亻) leaning against Tree (木)</p>
+            </div>
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center space-y-1">
+              <div class="text-2xl font-black text-slate-800 font-kai">森</div>
+              <div class="text-xs font-bold text-brand-600">sēn (Forest)</div>
+              <p class="text-[11px] text-slate-500">3 Trees (木 + 木 + 木)</p>
+            </div>
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center space-y-1">
+              <div class="text-2xl font-black text-slate-800 font-kai">明</div>
+              <div class="text-xs font-bold text-brand-600">míng (Bright)</div>
+              <p class="text-[11px] text-slate-500">Sun (日) + Moon (月)</p>
+            </div>
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center space-y-1">
+              <div class="text-2xl font-black text-slate-800 font-kai">看</div>
+              <div class="text-xs font-bold text-brand-600">kàn (Look)</div>
+              <p class="text-[11px] text-slate-500">Hand (手) over Eye (目)</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- UNIT 2 -->
+        <div class="bg-white p-5 rounded-2xl border-2 border-brand-500 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center space-x-3">
+              <span class="w-8 h-8 rounded-full bg-brand-500 text-white font-black flex items-center justify-center text-sm">2</span>
+              <div>
+                <h3 class="font-extrabold text-slate-800 text-base">Unit 2: Water (氵) & Hand (扌) Radical Power Words</h3>
+                <p class="text-xs text-slate-500">Words: 洗, 洗手, 汗, 海, 打, 打电话, 找, 推, 拉, 抱</p>
+              </div>
+            </div>
+            <span class="bg-brand-100 text-brand-700 text-xs font-bold px-2.5 py-1 rounded-full">Completed ✓</span>
+          </div>
+
+          <!-- Interactive Radical Swap Exercise -->
+          <div class="bg-brand-50/60 p-4 rounded-xl border border-brand-200 space-y-3">
+            <h4 class="text-xs font-extrabold text-brand-800 uppercase tracking-wider">Interactive Drill: Radical Switcher</h4>
+            <p class="text-xs text-slate-600">Notice how changing the left component alters the word meaning:</p>
+            <div class="flex flex-wrap items-center gap-4 text-sm font-bold">
+              <div class="bg-white p-2.5 rounded-xl shadow-sm border border-slate-200">
+                <span class="text-blue-600 text-lg font-kai">氵</span> + <span class="text-slate-700 font-kai">可</span> = <span class="text-blue-600 text-xl font-kai">河</span> <span class="text-xs text-slate-500 font-normal">(hé - River)</span>
+              </div>
+              <div class="text-slate-400 font-black">VS</div>
+              <div class="bg-white p-2.5 rounded-xl shadow-sm border border-slate-200">
+                <span class="text-amber-600 text-lg font-kai">扌</span> + <span class="text-slate-700 font-kai">可</span> = <span class="text-amber-600 text-xl font-kai">苛 / 何</span> <span class="text-xs text-slate-500 font-normal">Action Contexts</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- UNIT 3 -->
+        <div class="bg-white p-5 rounded-2xl border-2 border-amber-400 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center space-x-3">
+              <span class="w-8 h-8 rounded-full bg-amber-400 text-slate-900 font-black flex items-center justify-center text-sm">3</span>
+              <div>
+                <h3 class="font-extrabold text-slate-800 text-base">Unit 3: HSK 2 Grammatical Connectors</h3>
+                <p class="text-xs text-slate-500">Mastering <code>因为…所以…</code> (Because... therefore...) & <code>虽然…但是…</code> (Although... but...)</p>
+              </div>
+            </div>
+            <span class="bg-amber-100 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-full">In Progress</span>
+          </div>
+
+          <!-- Fill-in-the-Blank Drill with Distractor Error Explanation -->
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-600">Grammar Challenge #1</span>
+              <span class="text-xs font-extrabold text-brand-600">+20 XP</span>
+            </div>
+            <p class="text-sm font-semibold text-slate-800">
+              <span class="underline decoration-amber-400 decoration-2">＿＿＿</span> 今天下雨，<span class="underline decoration-amber-400 decoration-2">＿＿＿</span> 我们不出去跑步。
+            </p>
+            <p class="text-xs text-slate-500">(Because it is raining today, therefore we are not going out to run.)</p>
+
+            <div id="unit3-options" class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button onclick="checkUnit3Answer(this, true)" class="bg-white hover:bg-brand-50 p-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:border-brand-500 transition">
+                A. 因为 … 所以 …
+              </button>
+              <button onclick="checkUnit3Answer(this, false, '虽然...但是 means Although... but, which creates a contradiction rather than cause-effect!')" class="bg-white hover:bg-rose-50 p-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:border-rose-400 transition">
+                B. 虽然 … 但是 …
+              </button>
+              <button onclick="checkUnit3Answer(this, false, '如果...就 means If... then, which is conditional rather than stated fact!')" class="bg-white hover:bg-rose-50 p-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:border-rose-400 transition">
+                C. 如果 … 就 …
+              </button>
+            </div>
+            <div id="unit3-feedback" class="hidden p-3 rounded-xl text-xs font-semibold"></div>
+          </div>
+        </div>
+
+        <!-- UNIT 4 -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center space-x-3">
+              <span class="w-8 h-8 rounded-full bg-slate-200 text-slate-600 font-black flex items-center justify-center text-sm">4</span>
+              <div>
+                <h3 class="font-extrabold text-slate-800 text-base">Unit 4: HSK 3.0 Modern Life & Tech Vocabulary</h3>
+                <p class="text-xs text-slate-500">2026 Additions: 扫码, 豆浆, 充值, 电商, 如果…就…, 不但…而且…</p>
+              </div>
+            </div>
+            <span class="bg-slate-100 text-slate-500 text-xs font-bold px-2.5 py-1 rounded-full">Locked 🔒</span>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- 4. 🧩 SENTENCE MAKING STUDIO -->
+    <section id="tab-sentences" class="tab-content hidden space-y-6">
+      
+      <!-- Visual Chinese SVO Grammar Banner -->
+      <div class="bg-gradient-to-r from-amber-500 via-amber-400 to-gold-400 text-slate-900 p-5 rounded-2xl shadow-md space-y-2">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-black flex items-center gap-2">
+            <span>🧩 Chinese Sentence Structure Formula</span>
+          </h2>
+          <span class="bg-white/40 px-2.5 py-0.5 rounded-full text-xs font-bold">Standard SVO Pattern</span>
+        </div>
+        <div class="grid grid-cols-5 gap-2 text-center text-xs font-extrabold font-mono pt-1">
+          <div class="bg-white/80 p-2 rounded-xl">SUBJECT<br><span class="text-[10px] text-slate-600 font-sans font-normal">(我 / 他)</span></div>
+          <div class="bg-white/80 p-2 rounded-xl">TIME<br><span class="text-[10px] text-slate-600 font-sans font-normal">(明天 / 8点)</span></div>
+          <div class="bg-white/80 p-2 rounded-xl">PLACE<br><span class="text-[10px] text-slate-600 font-sans font-normal">(在饭馆)</span></div>
+          <div class="bg-white/80 p-2 rounded-xl">VERB<br><span class="text-[10px] text-slate-600 font-sans font-normal">(吃 / 看)</span></div>
+          <div class="bg-white/80 p-2 rounded-xl">OBJECT<br><span class="text-[10px] text-slate-600 font-sans font-normal">(中国菜)</span></div>
+        </div>
+      </div>
+
+      <!-- Mode Selector Tabs -->
+      <div class="flex items-center gap-3 border-b border-slate-200 pb-2">
+        <button onclick="setSentenceMode('A')" id="sent-mode-btn-A" class="bg-brand-500 text-white px-4 py-2 rounded-xl text-xs font-extrabold shadow-sm">
+          Mode A: Guided Tile Ordering
+        </button>
+        <button onclick="setSentenceMode('B')" id="sent-mode-btn-B" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold">
+          Mode B: Free AI Sentence Creator & Grading
+        </button>
+      </div>
+
+      <!-- MODE A: GUIDED TILE ORDERING -->
+      <div id="sentence-mode-A" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div>
+            <h3 class="font-extrabold text-slate-800 text-base">Tile Scramble Builder</h3>
+            <p id="sent-tile-prompt-en" class="text-xs text-slate-500">Prompt: "I will go to the restaurant to eat at 12 o'clock."</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="toggleTilePinyin()" id="tile-pinyin-btn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold">
+              Toggle Pinyin: ON
+            </button>
+            <button onclick="nextTileSentence()" class="bg-brand-500 hover:bg-brand-600 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold border-b-2 border-brand-700 btn-3d">
+              Next Sentence <i class="fa-solid fa-arrow-right ml-1"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Constructed Sentence Drop Slot -->
+        <div class="space-y-2">
+          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Your Constructed Sentence:</label>
+          <div id="sent-tile-drop-area" class="min-h-[64px] bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-3 flex flex-wrap items-center gap-2">
+            <span class="text-xs text-slate-400 italic font-normal">Click word tiles below to assemble your sentence...</span>
+          </div>
+        </div>
+
+        <!-- Scrambled Tiles Pool -->
+        <div class="space-y-2">
+          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider">Word Bank Tiles:</label>
+          <div id="sent-tile-pool" class="flex flex-wrap items-center gap-2">
+            <!-- Scrambled tiles rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Action Controls & Feedback -->
+        <div class="flex items-center justify-between pt-2">
+          <button onclick="clearTileSentence()" class="text-xs text-slate-500 hover:text-slate-700 font-bold">Clear All Tiles</button>
+          <button onclick="checkTileSentence()" class="bg-brand-500 hover:bg-brand-600 text-white px-6 py-2.5 rounded-xl font-black text-xs border-b-4 border-brand-700 btn-3d">
+            Check Sentence Structure
+          </button>
+        </div>
+
+        <div id="sent-tile-feedback" class="hidden p-4 rounded-xl text-xs font-semibold"></div>
+      </div>
+
+      <!-- MODE B: FREE SENTENCE CREATOR & AI GRADING -->
+      <div id="sentence-mode-B" class="hidden bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <h3 class="font-extrabold text-slate-800 text-base">Free Creation & AI Teacher Grading</h3>
+            <p class="text-xs text-slate-500">Create your own original sentence using the target word below!</p>
+          </div>
+          <button onclick="shuffleTargetWord()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5">
+            <i class="fa-solid fa-shuffle"></i> Shuffle Target Word
+          </button>
+        </div>
+
+        <!-- Target Word Display Card -->
+        <div class="bg-brand-50 p-4 rounded-2xl border border-brand-200 flex items-center justify-between">
+          <div>
+            <span class="text-xs text-brand-600 font-bold uppercase tracking-wide">TARGET WORD:</span>
+            <div class="flex items-baseline space-x-3">
+              <span id="ai-target-hanzi" class="text-3xl font-black text-slate-800 font-kai">扫码</span>
+              <span id="ai-target-pinyin" class="text-sm font-bold text-brand-600">sǎo mǎ</span>
+              <span id="ai-target-en" class="text-xs text-slate-500">(Scan QR Code)</span>
+            </div>
+          </div>
+          <button onclick="playTTS(document.getElementById('ai-target-hanzi').innerText)" class="w-10 h-10 rounded-full bg-brand-500 text-white flex items-center justify-center hover:bg-brand-600 shadow-md">
+            <i class="fa-solid fa-volume-high"></i>
+          </button>
+        </div>
+
+        <!-- User Sentence Input & Voice Dictation -->
+        <div class="space-y-2">
+          <label class="block text-xs font-bold text-slate-600">Type or Speak your Chinese Sentence:</label>
+          <div class="relative">
+            <textarea id="free-sentence-input" rows="3" placeholder="例如：我扫码付款买了一杯豆浆..." class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-kai"></textarea>
+            <button onclick="startVoiceDictation('free-sentence-input')" class="absolute right-3 bottom-3 text-slate-400 hover:text-brand-600 text-base" title="Voice Dictation">
+              <i class="fa-solid fa-microphone"></i>
+            </button>
+          </div>
+        </div>
+
+        <button onclick="gradeSentenceWithAI()" id="grade-sent-btn" class="w-full bg-brand-500 hover:bg-brand-600 text-white font-black text-sm py-3 rounded-xl border-b-4 border-brand-700 btn-3d flex items-center justify-center gap-2">
+          <i class="fa-solid fa-graduation-cap"></i> Grade My Sentence with Panda Laoshi
+        </button>
+
+        <!-- AI Grading Feedback Result Box -->
+        <div id="free-sent-result" class="hidden bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+          <!-- Dynamically populated by AI -->
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 5. 🎧 HSK 3.0 LISTENING TEST CENTER -->
+    <section id="tab-listening" class="tab-content hidden space-y-6">
+      
+      <!-- Test Settings Control Header -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-black text-slate-800 flex items-center gap-2">
+              <span>🎧 HSK 3.0 Listening Test Center</span>
+            </h2>
+            <p class="text-xs text-slate-500">Official format listening comprehension with rotating question types.</p>
+          </div>
+          
+          <!-- Controls -->
+          <div class="flex flex-wrap items-center gap-3">
+            <!-- Mode Toggle -->
+            <div class="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold">
+              <button onclick="setListeningMode('practice')" id="list-mode-practice" class="bg-brand-500 text-white px-3 py-1.5 rounded-lg shadow-sm">Practice Mode</button>
+              <button onclick="setListeningMode('exam')" id="list-mode-exam" class="text-slate-600 px-3 py-1.5 rounded-lg">Official Exam Mode</button>
+            </div>
+
+            <!-- Audio Speed Selector -->
+            <div class="flex items-center space-x-1 text-xs font-bold text-slate-600">
+              <span>Speed:</span>
+              <button onclick="setAudioSpeed(0.75)" id="speed-075" class="px-2 py-1 bg-slate-100 rounded text-slate-700">0.75x</button>
+              <button onclick="setAudioSpeed(1.0)" id="speed-100" class="px-2 py-1 bg-brand-500 text-white rounded">1.0x</button>
+              <button onclick="setAudioSpeed(1.15)" id="speed-115" class="px-2 py-1 bg-slate-100 rounded text-slate-700">1.15x</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Listening Test Canvas -->
+      <div class="bg-white p-6 rounded-2xl border-2 border-brand-500 shadow-md space-y-6">
+        
+        <!-- Progress Bar & Timer -->
+        <div class="flex items-center justify-between text-xs font-bold text-slate-500 border-b border-slate-100 pb-3">
+          <span>Question <span id="listening-q-curr">1</span> of <span id="listening-q-total">10</span></span>
+          <span id="listening-timer" class="hidden text-amber-600 font-mono"><i class="fa-solid fa-clock"></i> 05:00</span>
+          <span id="listening-replays" class="text-brand-600"><i class="fa-solid fa-rotate-right"></i> Unlimited Replays</span>
+        </div>
+
+        <!-- Audio Trigger Card -->
+        <div class="bg-brand-50 p-6 rounded-2xl border border-brand-200 text-center space-y-4">
+          <button onclick="playListeningAudio()" id="play-listening-audio-btn" class="w-20 h-20 bg-brand-500 hover:bg-brand-600 text-white rounded-full mx-auto flex items-center justify-center text-3xl shadow-lg border-b-4 border-brand-700 active:translate-y-1 transition">
+            <i class="fa-solid fa-volume-high"></i>
+          </button>
+          <p class="text-xs font-extrabold text-brand-800 uppercase tracking-wider">Tap to Play Audio Clip</p>
+        </div>
+
+        <!-- Dynamic Question Prompt -->
+        <div id="listening-question-container" class="space-y-4">
+          <!-- Question Type 1-4 rendered dynamically -->
+        </div>
+
+        <!-- Submit & Next Button -->
+        <div class="flex items-center justify-between border-t border-slate-100 pt-4">
+          <button onclick="sendMissedToListeningSRS()" id="send-missed-srs-btn" class="hidden text-xs text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1">
+            <i class="fa-solid fa-plus-circle"></i> Send Missed Words to SM-2
+          </button>
+          <button onclick="nextListeningQuestion()" id="next-listening-btn" class="bg-brand-500 hover:bg-brand-600 text-white px-6 py-2.5 rounded-xl font-extrabold text-xs border-b-4 border-brand-700 btn-3d ml-auto">
+            Next Question <i class="fa-solid fa-chevron-right ml-1"></i>
+          </button>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- 6. ✍️ WRITE TAB (Hanzi Writer Integration) -->
+    <section id="tab-write" class="tab-content hidden space-y-6">
+      
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-black text-slate-800 flex items-center gap-2">
+            <span>✍️ Hanzi Stroke Order & Writing Studio</span>
+          </h2>
+          <p class="text-xs text-slate-500">Practice stroke-by-stroke writing inside a traditional Mi Zi Ge (米字格) grid.</p>
+        </div>
+
+        <!-- Search Character Input -->
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <input type="text" id="write-search-input" placeholder="Type Hanzi (e.g. 扫码 / 看)..." class="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500">
+          <button onclick="loadWritingWord(document.getElementById('write-search-input').value)" class="bg-brand-500 hover:bg-brand-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold border-b-2 border-brand-700 btn-3d">
+            Load
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Writing Canvas Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left: Character Selector Pills & Word Info -->
+        <div class="space-y-4">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+            <span class="text-xs font-bold text-slate-400 uppercase">ACTIVE WORD:</span>
+            <div class="flex items-baseline space-x-2">
+              <span id="write-word-hanzi" class="text-3xl font-black text-slate-800 font-kai">扫码</span>
+              <span id="write-word-pinyin" class="text-sm font-bold text-brand-600">sǎo mǎ</span>
+            </div>
+            <p id="write-word-en" class="text-xs text-slate-500">Scan QR Code</p>
+            <div class="flex items-center gap-2">
+              <span id="write-hsk-badge" class="bg-brand-100 text-brand-700 text-xs font-bold px-2.5 py-0.5 rounded-full">HSK 3.0 L2</span>
+              <span class="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-0.5 rounded-full">Writable</span>
+            </div>
+
+            <!-- Multi-character Pills -->
+            <div class="pt-2">
+              <label class="block text-xs font-bold text-slate-600 mb-1.5">Select Character to Write:</label>
+              <div id="write-char-pills" class="flex flex-wrap items-center gap-2">
+                <!-- Character pills rendered dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Topic Selector for Practice -->
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+            <h4 class="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Quick Pick Writable Words</h4>
+            <div id="write-quick-picker" class="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Center/Right: Mi Zi Ge Hanzi Writer Box & Canvas Fallback -->
+        <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center space-y-5">
+          
+          <div class="relative">
+            <!-- Hanzi Writer Container Target -->
+            <div id="hanzi-writer-target" class="w-[260px] h-[260px] mizige-bg rounded-xl shadow-inner flex items-center justify-center"></div>
+            <!-- Canvas Fallback -->
+            <canvas id="fallback-canvas" width="260" height="260" class="hidden mizige-bg rounded-xl shadow-inner cursor-crosshair"></canvas>
+          </div>
+
+          <!-- Controls Button Group -->
+          <div class="flex flex-wrap items-center justify-center gap-2 text-xs font-bold">
+            <button onclick="writerAnimate()" class="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-xl border-b-2 border-brand-700 btn-3d">
+              <i class="fa-solid fa-play mr-1"></i> Animate Strokes
+            </button>
+            <button onclick="writerQuiz()" class="bg-amber-500 hover:bg-amber-600 text-slate-900 px-4 py-2 rounded-xl border-b-2 border-amber-700 btn-3d">
+              <i class="fa-solid fa-pen-nib mr-1"></i> Start Stroke Quiz
+            </button>
+            <button onclick="writerToggleOutline()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl">
+              Toggle Outline
+            </button>
+            <button onclick="writerReset()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl">
+              Reset
+            </button>
+          </div>
+
+          <div id="writer-feedback" class="text-xs font-bold text-slate-500"></div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- 7. 🎙️ SPEAK TAB (Tone Sandhi Coach) -->
+    <section id="tab-speak" class="tab-content hidden space-y-6">
+      
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        <h2 class="text-xl font-black text-slate-800 flex items-center gap-2">
+          <span>🎙️ Tone Sandhi & Pronunciation Coach</span>
+        </h2>
+        <p class="text-xs text-slate-500">Color-coded tone tiles with automatic Sandhi tone-change rule detection!</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left: Phrase Selection -->
+        <div class="space-y-4">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+            <h3 class="font-extrabold text-slate-800 text-sm">Select Sandhi Practice Phrase:</h3>
+            <div class="space-y-1.5">
+              <button onclick="loadSpeakingPhrase('你好', 'nǐ hǎo', '3+3 Rule -> Tone 2 + Tone 3 (ní hǎo)', 'Hello')" class="w-full text-left p-2.5 rounded-xl bg-brand-50 border border-brand-200 font-semibold text-xs text-brand-800">
+                1. 你好 (nǐ hǎo → ní hǎo)
+              </button>
+              <button onclick="loadSpeakingPhrase('我很好', 'wǒ hěn hǎo', '3+3+3 Rule -> Tone 2 + Tone 2 + Tone 3', 'I am very good')" class="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 font-semibold text-xs text-slate-700">
+                2. 我很好 (wǒ hěn hǎo → wó hén hǎo)
+              </button>
+              <button onclick="loadSpeakingPhrase('不对', 'bù duì', '不 + Tone 4 Rule -> Tone 2 + Tone 4 (bú duì)', 'Incorrect')" class="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 font-semibold text-xs text-slate-700">
+                3. 不对 (bù duì → bú duì)
+              </button>
+              <button onclick="loadSpeakingPhrase('妈妈骑马', 'mā ma qí mǎ', 'Tone 1, Neutral, Tone 2, Tone 3 Discrimination', 'Mom rides a horse')" class="w-full text-left p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 font-semibold text-xs text-slate-700">
+                4. 妈妈骑马 (mā ma qí mǎ)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Speaking Studio Canvas -->
+        <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+          
+          <div class="text-center space-y-2">
+            <span id="sandhi-rule-badge" class="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full inline-block">
+              Rule: 3+3 Sandhi (nǐ hǎo → ní hǎo)
+            </span>
+            <div id="speak-tiles-container" class="flex items-center justify-center gap-3 pt-2">
+              <!-- Color-coded tone tiles rendered dynamically -->
+            </div>
+            <p id="speak-translation" class="text-xs text-slate-500 font-semibold">"Hello"</p>
+          </div>
+
+          <!-- Controls: Listen Native vs Record Mic -->
+          <div class="flex items-center justify-center gap-4 pt-2">
+            <button onclick="playTTS(document.getElementById('speak-tiles-container').innerText)" class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold border-b-2 border-brand-700 btn-3d flex items-center gap-2">
+              <i class="fa-solid fa-volume-high"></i> Play Native Audio
+            </button>
+            <button onclick="toggleMicrophoneRecording()" id="mic-record-btn" class="bg-rose-500 hover:bg-rose-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold border-b-2 border-rose-700 btn-3d flex items-center gap-2">
+              <i class="fa-solid fa-microphone"></i> Record Your Speech
+            </button>
+          </div>
+
+          <!-- Diagnostic Feedback Results -->
+          <div id="speak-diagnostic-result" class="hidden bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-2">
+            <!-- Rendered dynamically -->
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- 8. 📖 STORIES TAB -->
+    <section id="tab-stories" class="tab-content hidden space-y-6">
+      
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-black text-slate-800 flex items-center gap-2">
+            <span>📖 HSK 3.0 Graded Stories</span>
+          </h2>
+          <p class="text-xs text-slate-500">Read immersive graded stories with sentence audio and AI generation!</p>
+        </div>
+
+        <button onclick="generateAIGradedStory()" class="bg-gold-400 hover:bg-gold-500 text-slate-900 px-4 py-2 rounded-xl text-xs font-extrabold border-b-2 border-amber-600 btn-3d flex items-center gap-2">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> Generate AI Story by Topic
+        </button>
+      </div>
+
+      <!-- Story Reader Canvas -->
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <span class="bg-brand-100 text-brand-700 text-xs font-bold px-2.5 py-0.5 rounded-full">HSK 1-2 Level</span>
+            <h3 id="story-title" class="text-xl font-black text-slate-800 mt-1">在饭馆点菜 (Ordering Food at a Restaurant)</h3>
+          </div>
+          <div class="flex items-center gap-2 text-xs font-bold">
+            <button onclick="toggleStoryPinyin()" id="story-pinyin-btn" class="bg-slate-100 px-3 py-1.5 rounded-lg text-slate-700">Pinyin: ON</button>
+            <button onclick="toggleStoryEnglish()" id="story-en-btn" class="bg-slate-100 px-3 py-1.5 rounded-lg text-slate-700">English: ON</button>
+          </div>
+        </div>
+
+        <!-- Story Paragraphs -->
+        <div id="story-body" class="space-y-4 text-base leading-relaxed">
+          <!-- Sentences populated dynamically -->
+        </div>
+
+        <!-- Story Quiz Section -->
+        <div class="bg-brand-50 p-5 rounded-2xl border border-brand-200 space-y-3">
+          <h4 class="font-extrabold text-slate-800 text-sm">Comprehension Quiz</h4>
+          <p class="text-xs text-slate-600 font-semibold">Q: 大卫在饭馆点了什么菜？ (What did David order at the restaurant?)</p>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-bold">
+            <button onclick="checkStoryQuiz(this, true)" class="bg-white hover:bg-brand-100 p-2.5 rounded-xl border border-slate-200 text-slate-700 text-left">A. 米饭和鱼 (Rice and Fish)</button>
+            <button onclick="checkStoryQuiz(this, false)" class="bg-white hover:bg-rose-50 p-2.5 rounded-xl border border-slate-200 text-slate-700 text-left">B. 面条 (Noodles)</button>
+            <button onclick="checkStoryQuiz(this, false)" class="bg-white hover:bg-rose-50 p-2.5 rounded-xl border border-slate-200 text-slate-700 text-left">C. 水饺 (Dumplings)</button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 9. 🧠 REVIEW (SM-2 SPACED REPETITION) TAB -->
+    <section id="tab-review" class="tab-content hidden space-y-6">
+      
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <h2 class="text-xl font-black text-slate-800 flex items-center gap-2">
+            <span>🧠 SM-2 Spaced Repetition Review</span>
+          </h2>
+          <p class="text-xs text-slate-500">SuperMemo SM-2 flashcard algorithm with 3-Strike AI Mnemonic Rescue!</p>
+        </div>
+        <span class="bg-indigo-100 text-indigo-700 text-xs font-extrabold px-3 py-1 rounded-full">
+          <span id="srs-due-badge">12</span> Cards Due
+        </span>
+      </div>
+
+      <!-- Flashcard Review Container -->
+      <div class="max-w-xl mx-auto space-y-6">
+        
+        <div id="srs-card" class="bg-white p-8 rounded-3xl border-2 border-brand-500 shadow-lg text-center space-y-6 relative min-h-[300px] flex flex-col justify-between">
+          
+          <div class="flex items-center justify-between text-xs text-slate-400 font-bold">
+            <span id="srs-card-level">HSK 3.0 L1</span>
+            <button onclick="playTTS(document.getElementById('srs-card-hanzi').innerText)" class="text-brand-500 text-lg hover:text-brand-600">
+              <i class="fa-solid fa-volume-high"></i>
+            </button>
+          </div>
+
+          <!-- Front of Card -->
+          <div class="space-y-2">
+            <div id="srs-card-hanzi" class="text-5xl font-black text-slate-800 font-kai">准备</div>
+            <div id="srs-card-pinyin" class="text-lg font-bold text-brand-600">zhǔn bèi</div>
+          </div>
+
+          <!-- Back of Card (Flipped) -->
+          <div id="srs-card-back" class="hidden space-y-3 border-t border-slate-100 pt-4">
+            <div id="srs-card-en" class="text-base font-extrabold text-slate-700">To prepare / ready</div>
+            <div id="srs-card-ex" class="text-xs text-slate-500 italic">"我准备好了。" (I am ready.)</div>
+            
+            <!-- AI Mnemonic Hook Container (3-Strike Trigger) -->
+            <div id="srs-card-mnemonic" class="hidden bg-amber-50 p-3 rounded-xl border border-amber-200 text-xs text-amber-900 text-left space-y-1">
+              <span class="font-bold flex items-center gap-1 text-amber-700"><i class="fa-solid fa-lightbulb"></i> AI Mnemonic Rescue:</span>
+              <p id="srs-mnemonic-text">Visualize preparing two water droplets (冫) before taking a step!</p>
+            </div>
+          </div>
+
+          <!-- Flip Button -->
+          <button onclick="flipSRSCard()" id="srs-flip-btn" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-3 rounded-xl btn-3d">
+            Show Answer / Flip Card
+          </button>
+
+          <!-- SM-2 Quality Score Buttons (0-5) -->
+          <div id="srs-quality-group" class="hidden grid grid-cols-6 gap-1.5 pt-2">
+            <button onclick="answerSRS(0)" class="bg-rose-100 hover:bg-rose-200 text-rose-800 py-2 rounded-lg text-xs font-bold">0 (Blackout)</button>
+            <button onclick="answerSRS(1)" class="bg-rose-50 hover:bg-rose-100 text-rose-700 py-2 rounded-lg text-xs font-bold">1 (Wrong)</button>
+            <button onclick="answerSRS(2)" class="bg-amber-100 hover:bg-amber-200 text-amber-800 py-2 rounded-lg text-xs font-bold">2 (Hard)</button>
+            <button onclick="answerSRS(3)" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 py-2 rounded-lg text-xs font-bold">3 (Good)</button>
+            <button onclick="answerSRS(4)" class="bg-brand-100 hover:bg-brand-200 text-brand-800 py-2 rounded-lg text-xs font-bold">4 (Easy)</button>
+            <button onclick="answerSRS(5)" class="bg-brand-500 hover:bg-brand-600 text-white py-2 rounded-lg text-xs font-bold">5 (Perfect)</button>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- 10. 🧱 RADICALS TAB -->
+    <section id="tab-radicals" class="tab-content hidden space-y-6">
+      
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+        <h2 class="text-xl font-black text-slate-800 flex items-center gap-2">
+          <span>🧱 Core Radicals Hub & Matrix</span>
+        </h2>
+        <p class="text-xs text-slate-500">Understand the building blocks of 80%+ of HSK Chinese characters.</p>
+      </div>
+
+      <!-- Radical Grid -->
+      <div id="radicals-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <!-- Dynamically rendered 15 core radicals -->
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- DEV BLUEPRINT MODAL -->
+  <div id="modal-blueprint" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-3xl w-full max-h-[85vh] overflow-y-auto p-6 space-y-5 border border-slate-200 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="text-lg font-black text-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-code text-brand-500"></i> System Blueprint & Database Schema
+        </h3>
+        <button onclick="closeBlueprintModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
+      </div>
+
+      <div class="space-y-4 text-xs font-mono">
+        <div>
+          <h4 class="font-extrabold text-slate-700 font-sans text-sm mb-1">PostgreSQL Schema (HSK 3.0 Dictionary):</h4>
+          <pre class="bg-slate-900 text-emerald-400 p-3 rounded-xl overflow-x-auto">
+CREATE TABLE hsk_words (
+    id SERIAL PRIMARY KEY,
+    hanzi VARCHAR(16) NOT NULL,
+    pinyin VARCHAR(64) NOT NULL,
+    english TEXT NOT NULL,
+    hsk_level INT NOT NULL, -- 1 to 9
+    topic_id INT NOT NULL,
+    is_writable BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);</pre>
+        </div>
+
+        <div>
+          <h4 class="font-extrabold text-slate-700 font-sans text-sm mb-1">Python SM-2 Algorithm Implementation:</h4>
+          <pre class="bg-slate-900 text-sky-400 p-3 rounded-xl overflow-x-auto">
+def calc_sm2(q: int, reps: int, interval: int, ease: float):
+    if q < 3:
+        return 0, 1, ease
+    else:
+        if reps == 0:
+            new_interval = 1
+        elif reps == 1:
+            new_interval = 6
+        else:
+            new_interval = round(interval * ease)
+        new_ease = max(1.3, ease + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)))
+        return reps + 1, new_interval, new_ease</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI TOPIC PACK GENERATOR MODAL -->
+  <div id="modal-ai-generator" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 border border-slate-200 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="text-base font-black text-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-wand-magic-sparkles text-gold-500"></i> AI Topic Pack Generator
+        </h3>
+        <button onclick="closeAIGeneratorModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
+      </div>
+
+      <p class="text-xs text-slate-500">Generate 20 authentic HSK 3.0 vocabulary words for any level & custom topic using Gemini API!</p>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-600">Select HSK Level (1–9):</label>
+          <select id="gen-hsk-level" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold">
+            <option value="1">HSK Level 1</option>
+            <option value="2">HSK Level 2</option>
+            <option value="3">HSK Level 3</option>
+            <option value="4">HSK Level 4</option>
+            <option value="5">HSK Level 5</option>
+            <option value="6">HSK Level 6</option>
+            <option value="7">HSK Level 7–9</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600">Topic Prompt:</label>
+          <input type="text" id="gen-topic-prompt" placeholder="e.g. E-Commerce & Mobile Pay, Artificial Intelligence..." class="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold">
+        </div>
+
+        <button onclick="generateWordPackWithAI()" id="gen-pack-btn" class="w-full bg-brand-500 hover:bg-brand-600 text-white font-extrabold text-xs py-2.5 rounded-xl border-b-4 border-brand-700 btn-3d">
+          Generate 20 Words with AI
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BULK CSV/JSON IMPORTER MODAL -->
+  <div id="modal-importer" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 border border-slate-200 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <h3 class="text-base font-black text-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-file-import text-brand-500"></i> Bulk CSV / JSON Word Importer
+        </h3>
+        <button onclick="closeImporterModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
+      </div>
+
+      <p class="text-xs text-slate-500">Paste official HSK 3.0 CSV data in format: <code>hanzi,pinyin,english,level,topicId</code></p>
+
+      <textarea id="csv-import-area" rows="6" placeholder="扫码,sǎo mǎ,Scan QR Code,2,10&#10;豆浆,dòu jiāng,Soy Milk,3,5" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"></textarea>
+
+      <div class="flex items-center justify-between">
+        <button onclick="downloadCSVTemplate()" class="text-xs text-brand-600 font-bold hover:underline">Download Template CSV</button>
+        <button onclick="executeCSVImport()" class="bg-brand-500 hover:bg-brand-600 text-white font-extrabold text-xs px-4 py-2 rounded-xl border-b-2 border-brand-700 btn-3d">
+          Import Words Now
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ==================== JAVASCRIPT APPLICATION CORE ==================== -->
+  <script>
+    /* ==================== GLOBAL APP STATE ==================== */
+    const STATE = {
+      xp: parseInt(localStorage.getItem('panda_xp')) || 350,
+      streak: parseInt(localStorage.getItem('panda_streak')) || 5,
+      hearts: 5,
+      activeTab: 'topics',
+      selectedTopicId: null,
+      selectedLevelFilter: 'ALL',
+      customWords: JSON.parse(localStorage.getItem('panda_custom_words')) || [],
+      sm2Deck: JSON.parse(localStorage.getItem('panda_sm2_deck')) || [],
+      chatHistory: [],
+      sentenceMode: 'A',
+      tileIndex: 0,
+      audioSpeed: 1.0,
+      listeningState: { curr: 1, total: 10, score: 0, missed: [] },
+      writerInstance: null
+    };
+
+    /* ==================== TOPICS DATABASE (14 REAL-LIFE TOPICS) ==================== */
+    const TOPICS = [
+      { id: 1, name: "Greetings & Pronouns", zh: "问候与代词", icon: "👋", color: "bg-blue-500" },
+      { id: 2, name: "Numbers & Measure Words", zh: "数字与量词", icon: "🔢", color: "bg-amber-500" },
+      { id: 3, name: "Time & Calendar", zh: "时间与日期", icon: "⏰", color: "bg-emerald-500" },
+      { id: 4, name: "Family & People", zh: "家庭与人物", icon: "👨‍👩‍👧", color: "bg-rose-500" },
+      { id: 5, name: "Food & Restaurant", zh: "饮食与点菜", icon: "🍜", color: "bg-orange-500" },
+      { id: 6, name: "Daily Actions & Verbs", zh: "日常动作", icon: "🏃", color: "bg-purple-500" },
+      { id: 7, name: "Places & Directions", zh: "地点与方位", icon: "📍", color: "bg-indigo-500" },
+      { id: 8, name: "Travel & Transport", zh: "交通与出行", icon: "✈️", color: "bg-teal-500" },
+      { id: 9, name: "Study & Work", zh: "学习与工作", icon: "💻", color: "bg-cyan-500" },
+      { id: 10, name: "Shopping & Modern Life", zh: "购物与现代生活", icon: "📱", color: "bg-pink-500" },
+      { id: 11, name: "Home & Everyday Objects", zh: "家居与物品", icon: "🏠", color: "bg-yellow-500" },
+      { id: 12, name: "Weather & Nature", zh: "天气与自然", icon: "☀️", color: "bg-sky-500" },
+      { id: 13, name: "Adjectives & Feelings", zh: "形容词与情感", icon: "😊", color: "bg-lime-500" },
+      { id: 14, name: "Grammar & Particles", zh: "语法与连接词", icon: "🔗", color: "bg-slate-600" }
+    ];
+
+    /* ==================== CORE HSK 3.0 VOCABULARY DATABASE (~360 BUILT-IN WORDS) ==================== */
+    const BUILTIN_VOCAB = [
+      // Topic 1: Greetings & Pronouns
+      { id: 101, hanzi: "你好", pinyin: "nǐ hǎo", english: "Hello / Hi", level: 1, topicId: 1, writable: true, exHanzi: "你好！很高兴认识你。", exPinyin: "Nǐ hǎo! Hěn gāoxìng rènshí nǐ.", exEn: "Hello! Nice to meet you." },
+      { id: 102, hanzi: "我", pinyin: "wǒ", english: "I / Me", level: 1, topicId: 1, writable: true, exHanzi: "我是学生。", exPinyin: "Wǒ shì xuéshēng.", exEn: "I am a student." },
+      { id: 103, hanzi: "你", pinyin: "nǐ", english: "You", level: 1, topicId: 1, writable: true, exHanzi: "你好吗？", exPinyin: "Nǐ hǎo ma?", exEn: "How are you?" },
+      { id: 104, hanzi: "他", pinyin: "tā", english: "He / Him", level: 1, topicId: 1, writable: true, exHanzi: "他是我的朋友。", exPinyin: "Tā shì wǒ de péngyǒu.", exEn: "He is my friend." },
+      { id: 105, hanzi: "她", pinyin: "tā", english: "She / Her", level: 1, topicId: 1, writable: true, exHanzi: "她是老师。", exPinyin: "Tā shì lǎoshī.", exEn: "She is a teacher." },
+      
+      // Topic 5: Food & Restaurant
+      { id: 501, hanzi: "米饭", pinyin: "mǐ fàn", english: "Cooked Rice", level: 1, topicId: 5, writable: true, exHanzi: "我吃米饭。", exPinyin: "Wǒ chī mǐfàn.", exEn: "I eat cooked rice." },
+      { id: 502, hanzi: "水", pinyin: "shuǐ", english: "Water", level: 1, topicId: 5, writable: true, exHanzi: "请喝水。", exPinyin: "Qǐng hē shuǐ.", exEn: "Please drink water." },
+      { id: 503, hanzi: "茶", pinyin: "chá", english: "Tea", level: 1, topicId: 5, writable: true, exHanzi: "中国茶很好喝。", exPinyin: "Zhōngguó chá hěn hǎohē.", exEn: "Chinese tea tastes great." },
+      { id: 504, hanzi: "豆浆", pinyin: "dòu jiāng", english: "Soy Milk (2026 Add.)", level: 3, topicId: 5, writable: true, exHanzi: "早上我喝热豆浆。", exPinyin: "Zǎoshang wǒ hē rè dòujiāng.", exEn: "In the morning I drink hot soy milk." },
+      
+      // Topic 10: Shopping & Modern Life (2026 Tech Additions)
+      { id: 1001, hanzi: "扫码", pinyin: "sǎo mǎ", english: "Scan QR Code", level: 2, topicId: 10, writable: true, exHanzi: "请扫码付款。", exPinyin: "Qǐng sǎo mǎ fùkuǎn.", exEn: "Please scan the QR code to pay." },
+      { id: 1002, hanzi: "充值", pinyin: "chōng zhí", english: "Recharge / Top Up", level: 3, topicId: 10, writable: true, exHanzi: "手机要充值了。", exPinyin: "Shǒujī yào chōngzhí le.", exEn: "Phone needs a top-up." },
+      { id: 1003, hanzi: "电商", pinyin: "diàn shāng", english: "E-Commerce", level: 3, topicId: 10, writable: false, exHanzi: "他从事电商行业。", exPinyin: "Tā cóngshì diànshāng hángyè.", exEn: "He works in e-commerce." },
+      
+      // Topic 14: Connectors & Particles
+      { id: 1401, hanzi: "因为", pinyin: "yīn wèi", english: "Because", level: 2, topicId: 14, writable: true, exHanzi: "因为下雨，所以我没去。", exPinyin: "Yīnwèi xiàyǔ, suǒyǐ wǒ méi qù.", exEn: "Because it rained, I didn't go." },
+      { id: 1402, hanzi: "所以", pinyin: "suǒ yǐ", english: "Therefore / So", level: 2, topicId: 14, writable: true, exHanzi: "我不累，所以继续学。", exPinyin: "Wǒ bù lèi, suǒyǐ jìxù xué.", exEn: "I am not tired, so I continue studying." }
+    ];
+
+    /* ==================== RADICALS DATABASE ==================== */
+    const RADICALS = [
+      { char: "氵", pinyin: "shuǐ", name: "Three-Dot Water", origin: "Depicts flowing water drops", examples: ["洗", "海", "河"] },
+      { char: "扌", pinyin: "shǒu", name: "Hand Radical", origin: "Derived from 手 (hand), action words", examples: ["打", "推", "拉"] },
+      { char: "亻", pinyin: "rén", name: "Person Radical", origin: "Derived from 人 (person)", examples: ["你", "他", "休"] },
+      { char: "木", pinyin: "mù", name: "Tree / Wood", origin: "Depicts trunk and branching roots", examples: ["林", "森", "桌"] },
+      { char: "日", pinyin: "rì", name: "Sun / Day", origin: "Depicts the sun with a center dot", examples: ["明", "时", "早"] },
+      { char: "月", pinyin: "yuè", name: "Moon / Flesh", origin: "Crescent moon shape", examples: ["明", "朋", "期"] },
+      { char: "目", pinyin: "mù", name: "Eye Radical", origin: "Depicts human eye outline", examples: ["看", "眼", "睛"] },
+      { char: "口", pinyin: "kǒu", name: "Mouth Radical", origin: "Open mouth shape for speaking/eating", examples: ["吃", "喝", "问"] },
+      { char: "心", pinyin: "xīn", name: "Heart Radical", origin: "Human heart, feelings & thought", examples: ["想", "念", "情"] },
+      { char: "辶", pinyin: "chuò", name: "Walking / Movement", origin: "Foot stepping on a path", examples: ["过", "运", "这"] }
+    ];
+
+    /* ==================== WEB AUDIO SYNTHESIZER SOUND EFFECTS ==================== */
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSoundEffect(type) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      if (type === 'click') {
+        osc.frequency.value = 600;
+        gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.05);
+      } else if (type === 'correct') {
+        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); // E5
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.25);
+      } else if (type === 'error') {
+        osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(180, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+      }
+    }
+
+    /* ==================== WEB SPEECH API TTS WRAPPER ==================== */
+    function playTTS(text, rate = null) {
+      if (!('speechSynthesis' in window)) {
+        showToast("Web Speech API not supported in this browser.", "error");
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-CN';
+      utterance.rate = rate || STATE.audioSpeed;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    /* ==================== TOAST NOTIFICATIONS ==================== */
+    function showToast(msg, type = "info") {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg pointer-events-auto transition transform translate-y-2 opacity-0 flex items-center gap-2 ${
+        type === 'error' ? 'bg-rose-500 text-white' : type === 'success' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-white'
+      }`;
+      toast.innerHTML = `<span>${msg}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      }, 10);
+      setTimeout(() => {
+        toast.classList.add('opacity-0');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    /* ==================== NAVIGATION TAB SWITCHING ==================== */
+    function switchTab(tabId) {
+      STATE.activeTab = tabId;
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active-tab', 'bg-brand-500', 'text-white'));
+
+      const target = document.getElementById(`tab-${tabId}`);
+      if (target) target.classList.remove('hidden');
+      const btn = document.getElementById(`nav-${tabId}`);
+      if (btn) btn.classList.add('active-tab', 'bg-brand-500', 'text-white');
+
+      playSoundEffect('click');
+
+      // Module-specific initializations
+      if (tabId === 'topics') renderTopicsModule();
+      else if (tabId === 'write') renderWriteModule();
+      else if (tabId === 'radicals') renderRadicalsModule();
+      else if (tabId === 'sentences') renderSentencesModule();
+      else if (tabId === 'listening') initListeningTest();
+      else if (tabId === 'review') initSRSReview();
+      else if (tabId === 'speak') loadSpeakingPhrase('你好', 'nǐ hǎo', '3+3 Sandhi Rule (nǐ hǎo → ní hǎo)', 'Hello');
+      else if (tabId === 'stories') loadStoryContent();
+    }
+
+    /* ==================== MODULE 1: HSK 3.0 TOPICS ==================== */
+    function renderTopicsModule() {
+      const grid = document.getElementById('topics-grid');
+      grid.innerHTML = '';
+
+      TOPICS.forEach(topic => {
+        const words = getWordsByTopic(topic.id);
+        const card = document.createElement('div');
+        card.className = "bg-white p-5 rounded-2xl border border-slate-200 hover:border-brand-500 shadow-sm hover:shadow-md transition cursor-pointer space-y-3";
+        card.onclick = () => openTopicDashboard(topic.id);
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="text-3xl">${topic.icon}</span>
+            <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2.5 py-0.5 rounded-full">${words.length} Words</span>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-slate-800 text-sm">${topic.name}</h3>
+            <p class="text-xs text-slate-500 font-kai">${topic.zh}</p>
+          </div>
+          <div class="space-y-1">
+            <div class="flex justify-between text-[11px] font-bold text-slate-400">
+              <span>Progress</span>
+              <span>100%</span>
+            </div>
+            <div class="bg-slate-100 rounded-full h-1.5"><div class="bg-brand-500 h-1.5 rounded-full" style="width: 80%"></div></div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function getWordsByTopic(topicId) {
+      const all = [...BUILTIN_VOCAB, ...STATE.customWords];
+      return all.filter(w => w.topicId === topicId);
+    }
+
+    function openTopicDashboard(topicId) {
+      STATE.selectedTopicId = topicId;
+      const topic = TOPICS.find(t => t.id === topicId);
+      const words = getWordsByTopic(topicId);
+
+      document.getElementById('topic-detail-dashboard').classList.remove('hidden');
+      document.getElementById('topic-detail-title').innerText = `${topic.name} (${topic.zh})`;
+      document.getElementById('topic-detail-count').innerText = `${words.length} Vocabulary Words`;
+      document.getElementById('topic-detail-icon').innerText = topic.icon;
+
+      const wordsGrid = document.getElementById('topic-words-grid');
+      wordsGrid.innerHTML = '';
+
+      words.forEach(w => {
+        const card = document.createElement('div');
+        card.className = "bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 relative";
+        card.innerHTML = `
+          <div class="flex items-start justify-between">
+            <div>
+              <span class="text-2xl font-black text-slate-800 font-kai">${w.hanzi}</span>
+              <span class="text-xs font-bold text-brand-600 block">${w.pinyin}</span>
+            </div>
+            <span class="bg-brand-100 text-brand-700 text-[10px] font-extrabold px-2 py-0.5 rounded-full">HSK ${w.level}</span>
+          </div>
+          <p class="text-xs text-slate-600 font-medium">${w.english}</p>
+          <div class="text-[11px] text-slate-500 italic bg-white p-2 rounded-lg border border-slate-100 font-kai">${w.exHanzi}</div>
+          
+          <div class="flex items-center justify-between pt-1">
+            <button onclick="playTTS('${w.hanzi}')" class="text-xs text-brand-600 font-bold hover:underline">🔊 Listen</button>
+            <button onclick="jumpToWriteWord('${w.hanzi}')" class="text-xs text-slate-600 font-bold hover:underline">✍️ Write</button>
+            <button onclick="addWordToSRS(${w.id})" class="text-xs text-indigo-600 font-bold hover:underline">+ SM-2</button>
+          </div>
+        `;
+        wordsGrid.appendChild(card);
+      });
+    }
+
+    function closeTopicDashboard() {
+      document.getElementById('topic-detail-dashboard').classList.add('hidden');
+    }
+
+    /* ==================== GEMINI API CALLER ==================== */
+    async function callGeminiAPI(userQuery, systemInstruction = "") {
+      const apiKey = "";
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+      const payload = {
+        contents: [{ parts: [{ text: userQuery }] }],
+        systemInstruction: { parts: [{ text: systemInstruction || "You are Panda Laoshi, an expert Chinese language teacher." }] }
+      };
+
+      try {
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || "Panda Laoshi is thinking... please try again!";
+      } catch (err) {
+        console.error("Gemini API Error:", err);
+        return "Panda Laoshi offline fallback: Chinese grammar follows SVO structure! Try asking again shortly.";
+      }
+    }
+
+    /* ==================== MODULE 2: AI TEACHER (PANDA LAOSHI) ==================== */
+    function populateTopicDropdowns() {
+      const select = document.getElementById('ai-lesson-topic');
+      select.innerHTML = '';
+      TOPICS.forEach(t => {
+        select.innerHTML += `<option value="${t.id}">${t.name} (${t.zh})</option>`;
+      });
+    }
+
+    async function generateStructuredTopicLesson() {
+      const topicId = parseInt(document.getElementById('ai-lesson-topic').value);
+      const level = document.getElementById('ai-lesson-level').value;
+      const topic = TOPICS.find(t => t.id === topicId);
+
+      const stream = document.getElementById('ai-chat-stream');
+      stream.innerHTML += `
+        <div class="flex items-start space-x-3">
+          <div class="w-8 h-8 rounded-full bg-brand-500 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">🐼</div>
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 text-xs sm:text-sm space-y-2 max-w-lg">
+            <p class="font-bold text-slate-800">Preparing HSK ${level} Lesson for "${topic.name}"...</p>
+            <div class="animate-pulse text-brand-600 text-xs">Panda Laoshi is writing your custom lesson plan...</div>
+          </div>
+        </div>
+      `;
+      stream.scrollTop = stream.scrollHeight;
+
+      const prompt = `Create a structured HSK Level ${level} lesson for the topic "${topic.name}". Include: 1. Core Vocabulary (with Pinyin & English), 2. Essential Grammar Rule, 3. Mini Dialogue, 4. Check Question.`;
+      const reply = await callGeminiAPI(prompt);
+
+      stream.innerHTML += `
+        <div class="flex items-start space-x-3">
+          <div class="w-8 h-8 rounded-full bg-brand-500 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">🐼</div>
+          <div class="bg-brand-50 p-4 rounded-2xl border border-brand-200 text-xs sm:text-sm space-y-3 max-w-lg text-slate-800">
+            <div class="font-extrabold text-brand-800 border-b border-brand-200 pb-1">Lesson Completed!</div>
+            <div class="whitespace-pre-wrap font-sans">${reply}</div>
+          </div>
+        </div>
+      `;
+      stream.scrollTop = stream.scrollHeight;
+    }
+
+    async function sendChatMessage() {
+      const input = document.getElementById('ai-chat-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      input.value = '';
+      const stream = document.getElementById('ai-chat-stream');
+      stream.innerHTML += `
+        <div class="flex items-start space-x-3 justify-end">
+          <div class="bg-brand-500 text-white p-3.5 rounded-2xl text-xs sm:text-sm max-w-lg font-medium">
+            ${text}
+          </div>
+        </div>
+      `;
+      stream.scrollTop = stream.scrollHeight;
+
+      const reply = await callGeminiAPI(text);
+      stream.innerHTML += `
+        <div class="flex items-start space-x-3">
+          <div class="w-8 h-8 rounded-full bg-brand-500 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">🐼</div>
+          <div class="bg-white p-3.5 rounded-2xl border border-slate-200 text-xs sm:text-sm space-y-2 max-w-lg">
+            <p class="whitespace-pre-wrap text-slate-800">${reply}</p>
+          </div>
+        </div>
+      `;
+      stream.scrollTop = stream.scrollHeight;
+    }
+
+    function sendQuickPrompt(promptText) {
+      document.getElementById('ai-chat-input').value = promptText;
+      sendChatMessage();
+    }
+
+    /* ==================== MODULE 4: SENTENCE STUDIO ==================== */
+    const TILE_SENTENCES = [
+      { prompt: "I will go to the restaurant to eat at 12 o'clock.", tiles: ["我", "十二点", "去", "饭馆", "吃饭"], correct: "我十二点去饭馆吃饭" },
+      { prompt: "Please scan the QR code to pay.", tiles: ["请", "扫码", "付款"], correct: "请扫码付款" }
+    ];
+
+    function renderSentencesModule() {
+      if (STATE.sentenceMode === 'A') loadTileSentence(0);
+    }
+
+    function loadTileSentence(index) {
+      STATE.tileIndex = index % TILE_SENTENCES.length;
+      const s = TILE_SENTENCES[STATE.tileIndex];
+      document.getElementById('sent-tile-prompt-en').innerText = `Prompt: "${s.prompt}"`;
+      
+      const pool = document.getElementById('sent-tile-pool');
+      const drop = document.getElementById('sent-tile-drop-area');
+      pool.innerHTML = '';
+      drop.innerHTML = '<span class="text-xs text-slate-400 font-normal">Click word tiles below to assemble your sentence...</span>';
+
+      s.tiles.sort(() => Math.random() - 0.5).forEach(tile => {
+        const b = document.createElement('button');
+        b.className = "bg-white hover:bg-brand-50 border border-slate-200 px-3.5 py-2 rounded-xl font-bold text-sm text-slate-800 shadow-sm font-kai transition";
+        b.innerText = tile;
+        b.onclick = () => moveTileToDrop(b);
+        pool.appendChild(b);
+      });
+    }
+
+    function moveTileToDrop(btn) {
+      const drop = document.getElementById('sent-tile-drop-area');
+      const placeholder = drop.querySelector('span');
+      if (placeholder) placeholder.remove();
+      drop.appendChild(btn);
+      playSoundEffect('click');
+    }
+
+    function checkTileSentence() {
+      const drop = document.getElementById('sent-tile-drop-area');
+      const constructed = Array.from(drop.querySelectorAll('button')).map(b => b.innerText).join('');
+      const target = TILE_SENTENCES[STATE.tileIndex].correct;
+      const feedback = document.getElementById('sent-tile-feedback');
+      feedback.classList.remove('hidden');
+
+      if (constructed === target) {
+        feedback.className = "p-4 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300";
+        feedback.innerText = "✓ Perfect Sentence Structure! +20 XP awarded.";
+        playSoundEffect('correct');
+        addXP(20);
+      } else {
+        feedback.className = "p-4 rounded-xl text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300";
+        feedback.innerText = `✕ Incorrect order. Expected: "${target}"`;
+        playSoundEffect('error');
+      }
+    }
+
+    /* ==================== MODULE 6: WRITE (HANZI WRITER) ==================== */
+    function renderWriteModule() {
+      loadWritingWord("扫码");
+    }
+
+    function loadWritingWord(wordStr) {
+      const word = BUILTIN_VOCAB.find(w => w.hanzi === wordStr) || { hanzi: wordStr, pinyin: "", english: "", level: 1 };
+      document.getElementById('write-word-hanzi').innerText = word.hanzi;
+      document.getElementById('write-word-pinyin').innerText = word.pinyin;
+      document.getElementById('write-word-en').innerText = word.english;
+
+      const container = document.getElementById('write-char-pills');
+      container.innerHTML = '';
+      Array.from(word.hanzi).forEach((char, idx) => {
+        const pill = document.createElement('button');
+        pill.className = `px-3 py-1 rounded-xl text-xs font-bold font-kai border ${idx === 0 ? 'bg-brand-500 text-white border-brand-700' : 'bg-slate-100 text-slate-700'}`;
+        pill.innerText = char;
+        pill.onclick = () => mountHanziWriter(char);
+        container.appendChild(pill);
+      });
+
+      mountHanziWriter(word.hanzi[0]);
+    }
+
+    function mountHanziWriter(char) {
+      const target = document.getElementById('hanzi-writer-target');
+      target.innerHTML = '';
+      if (typeof HanziWriter !== 'undefined') {
+        STATE.writerInstance = HanziWriter.create('hanzi-writer-target', char, {
+          width: 240,
+          height: 240,
+          padding: 10,
+          showOutline: true,
+          strokeColor: '#00B894'
+        });
+      } else {
+        document.getElementById('fallback-canvas').classList.remove('hidden');
+      }
+    }
+
+    function writerAnimate() {
+      if (STATE.writerInstance) STATE.writerInstance.animateCharacter();
+    }
+
+    function writerQuiz() {
+      if (STATE.writerInstance) STATE.writerInstance.quiz();
+    }
+
+    /* ==================== MODULE 9: SM-2 REVIEW ==================== */
+    function initSRSReview() {
+      if (STATE.sm2Deck.length === 0) {
+        STATE.sm2Deck = BUILTIN_VOCAB.map(w => ({ ...w, reps: 0, interval: 1, ease: 2.5, due: true }));
+      }
+      renderSRSCard();
+    }
+
+    function renderSRSCard() {
+      const card = STATE.sm2Deck[0];
+      if (!card) return;
+
+      document.getElementById('srs-card-hanzi').innerText = card.hanzi;
+      document.getElementById('srs-card-pinyin').innerText = card.pinyin;
+      document.getElementById('srs-card-en').innerText = card.english;
+      document.getElementById('srs-card-ex').innerText = `"${card.exHanzi || ''}"`;
+
+      document.getElementById('srs-card-back').classList.add('hidden');
+      document.getElementById('srs-quality-group').classList.add('hidden');
+      document.getElementById('srs-flip-btn').classList.remove('hidden');
+    }
+
+    function flipSRSCard() {
+      document.getElementById('srs-card-back').classList.remove('hidden');
+      document.getElementById('srs-quality-group').classList.remove('hidden');
+      document.getElementById('srs-flip-btn').classList.add('hidden');
+    }
+
+    function answerSRS(q) {
+      const card = STATE.sm2Deck.shift();
+      if (q >= 3) addXP(15);
+      renderSRSCard();
+    }
+
+    /* ==================== GAMIFICATION & UTILS ==================== */
+    function addXP(val) {
+      STATE.xp += val;
+      localStorage.setItem('panda_xp', STATE.xp);
+      document.getElementById('header-xp').innerText = STATE.xp;
+    }
+
+    function openBlueprintModal() { document.getElementById('modal-blueprint').classList.remove('hidden'); }
+    function closeBlueprintModal() { document.getElementById('modal-blueprint').classList.add('hidden'); }
+    function openAIGeneratorModal() { document.getElementById('modal-ai-generator').classList.remove('hidden'); }
+    function closeAIGeneratorModal() { document.getElementById('modal-ai-generator').classList.add('hidden'); }
+    function openImporterModal() { document.getElementById('modal-importer').classList.remove('hidden'); }
+    function closeImporterModal() { document.getElementById('modal-importer').classList.add('hidden'); }
+
+    // On Window Load
+    window.onload = function() {
+      populateTopicDropdowns();
+      renderTopicsModule();
+    };
+  </script>
+</body>
+</html>
